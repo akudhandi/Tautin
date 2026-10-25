@@ -151,7 +151,7 @@
 **Tujuan Fase 3:** Menyelesaikan seluruh endpoint pencarian kontekstual, fitur pengingat anti-lupa, koleksi publik, serta verifikasi pembayaran langsung ke Google Play Developer API.
 
 ### 3.1 Feed, Pencarian Kontekstual (Full-Text) & Resurfacing API
-- [ ] **Lengkapi `app/Http/Controllers/Api/V1/LinkController.php`:**
+- [x] **Lengkapi `app/Http/Controllers/Api/V1/LinkController.php`:**
   - `GET /api/v1/links`:
     - Urutan default: `ORDER BY is_pinned DESC, updated_at DESC`.
     - Filter opsional: `collection_id`, `source_type`, `is_read`, dan `tag` (via `whereHas('tags', ...)`).
@@ -164,7 +164,7 @@
   - `DELETE /api/v1/links/{id}`: Hapus link milik user.
 
 ### 3.2 Native Google Play Billing Service (`AndroidPublisher`)
-- [ ] **Buat `app/Services/Billing/GooglePlayBillingService.php`:**
+- [x] **Buat `app/Services/Billing/GooglePlayBillingService.php`:**
   - Inisialisasi `Google\Client` menggunakan file kredensial Service Account JSON (`storage/app/google-play-service-account.json`) dengan scope `Google\Service\AndroidPublisher::ANDROIDPUBLISHER`.
   - Method `verifyAndAcknowledgeProduct(string $productId, string $purchaseToken)`:
     - Untuk pembelian sekali bayar (`tautin_pro_lifetime`).
@@ -177,7 +177,7 @@
     - Pastikan `subscriptionState` adalah `'SUBSCRIPTION_STATE_ACTIVE'` atau `'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'`.
     - Ambil waktu kedaluwarsa dari `lineItems[0]->getExpiryTime()`.
     - Jika `acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING'`, lakukan `acknowledge` melalui `$publisher->purchases_subscriptions->acknowledge(...)`.
-- [ ] **Buat `app/Actions/Billing/VerifyGooglePlayPurchaseAction.php` & `BillingController.php`:**
+- [x] **Buat `app/Actions/Billing/VerifyGooglePlayPurchaseAction.php` & `BillingController.php`:**
   - Endpoint `POST /api/v1/billing/verify-purchase`:
     1. Hitung `$tokenHash = hash('sha256', $purchaseToken)`.
     2. Cek di tabel `subscriptions`: jika `$tokenHash` sudah terdaftar milik `user_id` **lain**, tolak dengan `BusinessLogicException('INVALID_PURCHASE_TOKEN', 'Bukti pembelian ini sudah digunakan oleh akun lain.', 422)`.
@@ -187,10 +187,10 @@
     - Menerima array daftar transaksi dari fungsi *Restore Purchase* Flutter, memverifikasi token yang masih aktif, dan memulihkan status Pro pengguna.
 
 ### 3.3 Endpoint Koleksi Publik & Penjadwalan Cron (FCM)
-- [ ] **Buat `app/Http/Controllers/Api/V1/PublicCollectionController.php`:**
+- [x] **Buat `app/Http/Controllers/Api/V1/PublicCollectionController.php`:**
   - `GET /api/v1/public/collections/{slug}`: Ambil koleksi dengan `is_public = true` beserta daftar `links` di dalamnya. **Sangat Penting:** Gunakan `PublicLinkResource` yang menyembunyikan `user_notes` pribadi dan menyembunyikan `email` pemilik koleksi.
   - `POST /api/v1/public/collections/{slug}/clone`: Menyalin koleksi publik beserta link di dalamnya ke akun pengguna yang sedang login.
-- [ ] **Buat Layanan FCM & 4 Command Scheduler (`app/Console/Commands/`):**
+- [x] **Buat Layanan FCM & 4 Command Scheduler (`app/Console/Commands/`):**
   - `FcmNotificationService.php`: Mengirim push notification via FCM HTTP v1 API.
   - `DispatchLinkRemindersCommand.php` (`everyMinute()`): Kirim FCM untuk link yang `remind_at <= now()` dan `reminder_sent = false`, lalu set `reminder_sent = true`.
   - `SyncExpiredSubscriptionsCommand.php` (`hourly()`): Cek user `pro` yang `plan_expires_at <= now()` ke Google Play API; perpanjang jika user memperbarui langganan, atau kembalikan ke `free` jika sudah kedaluwarsa.

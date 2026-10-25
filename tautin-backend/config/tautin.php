@@ -16,6 +16,7 @@ return [
             'tautin_pro_yearly',
             'tautin_pro_lifetime',
         ],
+        'service_account_path' => env('GOOGLE_PLAY_SERVICE_ACCOUNT_PATH', storage_path('app/google-play-service-account.json')),
     ],
     'gemini' => [
         'model' => 'gemini-2.5-flash',
