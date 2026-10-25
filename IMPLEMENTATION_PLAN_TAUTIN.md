@@ -15,13 +15,13 @@
 **Tujuan Fase 1:** Membangun fondasi REST API Laravel 11+, mengeksekusi seluruh skema tabel MySQL 8.0, menyiapkan format respons JSON standar, serta mengaktifkan login Google yang otomatis membuat 5 koleksi bawaan dan menerapkan batasan kuota koleksi untuk pengguna gratis.
 
 ### 1.1 Inisialisasi Proyek & Konfigurasi Dasar
-- [ ] **Setup Laravel 11+ & Paket Utama:**
+- [x] **Setup Laravel 11+ & Paket Utama:**
   - Inisialisasi proyek di folder `tautin-backend/`.
   - Install paket wajib via Composer:
     - `laravel/sanctum` (Autentikasi API Token)
     - `google/apiclient` (Verifikasi Google ID Token & Google Play Developer API `AndroidPublisher`)
     - `symfony/dom-crawler` & `symfony/css-selector` (Parsing HTML & OpenGraph untuk *Scraper*)
-- [ ] **Buat File Konfigurasi Bisnis (`config/tautin.php`):**
+- [x] **Buat File Konfigurasi Bisnis (`config/tautin.php`):**
   - Definisikan konstanta bisnis agar tidak *hardcoded* di dalam *controller*:
     - `free_plan.max_collections` = `5`
     - `free_plan.max_public_collections` = `1`
@@ -32,41 +32,41 @@
     - `gemini.model` = `'gemini-2.5-flash'`
 
 ### 1.2 Standarisasi Respons API & Penanganan Error
-- [ ] **Buat Trait `app/Http/Traits/ApiResponseTrait.php`:**
+- [x] **Buat Trait `app/Http/Traits/ApiResponseTrait.php`:**
   - Method `successResponse($data, string $message, int $code = 200, array $meta = [])` yang selalu mengembalikan struktur:
     `{ "success": true, "message": "...", "data": ..., "meta": ... }`
   - Method `errorResponse(string $errorCode, string $message, int $httpCode = 400, $errors = null)` yang mengembalikan struktur:
     `{ "success": false, "error_code": "...", "message": "...", "errors": ... }`
-- [ ] **Buat Custom Exception `app/Exceptions/BusinessLogicException.php`:**
+- [x] **Buat Custom Exception `app/Exceptions/BusinessLogicException.php`:**
   - Menerima parameter `$errorCode` (misal: `COLLECTION_LIMIT_REACHED`), `$message` (Bahasa Indonesia), dan `$httpStatus` (misal: `403`).
   - Daftarkan di `bootstrap/app.php` agar otomatis merender format JSON standar saat dilempar dari *Action* atau *Service*.
 
 ### 1.3 Migrasi Database & Model Eloquent (MySQL 8.0)
-- [ ] **Buat & Jalankan 5 Migrasi Utama (Sesuai DDL di `ARCHITECTURE.md`):**
+- [x] **Buat & Jalankan 5 Migrasi Utama (Sesuai DDL di `ARCHITECTURE.md`):**
   1. `database/migrations/xxxx_create_users_table.php` (Kolom: `id`, `name`, `email`, `google_id`, `avatar`, `plan_type`, `plan_expires_at`, `ai_quota_left`, `fcm_token`, timestamps + index).
   2. `database/migrations/xxxx_create_collections_table.php` (Kolom: `id`, `user_id`, `name`, `icon`, `color`, `slug`, `is_public`, `is_default`, `sort_order`, timestamps + foreign key cascade).
   3. `database/migrations/xxxx_create_links_table.php` (Kolom: `id`, `user_id`, `collection_id`, `url`, `url_hash`, `domain`, `source_type`, `title`, `thumbnail_url`, `raw_description`, `ai_summary`, `user_notes`, `status`, `is_ai_processed`, `is_pinned`, `is_read`, `remind_at`, `reminder_sent`, timestamps + `UNIQUE(user_id, url_hash)` + `FULLTEXT(title, ai_summary, user_notes)`).
   4. `database/migrations/xxxx_create_tags_tables.php` (Tabel `tags` dan tabel pivot `link_tag`).
   5. `database/migrations/xxxx_create_subscriptions_table.php` (Kolom: `id`, `user_id`, `product_id`, `purchase_token`, `purchase_token_hash`, `order_id`, `status`, `starts_at`, `expires_at`, `last_verified_at`, timestamps).
-- [ ] **Buat Model Eloquent & Relasinya (`app/Models/`):**
+- [x] **Buat Model Eloquent & Relasinya (`app/Models/`):**
   - `User.php`: Helper methods `isPro(): bool`, `hasAiQuota(): bool`, relasi `collections()`, `links()`, `subscriptions()`.
   - `Collection.php`: Otomatis generate `slug` unik (`Str::slug($name) . '-' . Str::lower(Str::random(6))`) saat *creating*.
   - `Link.php`: Casts untuk boolean dan `remind_at` (`datetime`), relasi `user()`, `collection()`, `tags()`.
   - `Tag.php` & `Subscription.php`.
 
 ### 1.4 Autentikasi Google, Onboarding Seeder & Manajemen Koleksi
-- [ ] **Buat `app/Actions/Auth/SeedDefaultCollectionsAction.php`:**
+- [x] **Buat `app/Actions/Auth/SeedDefaultCollectionsAction.php`:**
   - Membuat 5 koleksi default untuk user baru:
     1. `Belanja & Wishlist` (`shopping_bag`, `#EC4899`)
     2. `Resep & Kuliner` (`restaurant`, `#F59E0B`)
     3. `Tontonan & Hiburan` (`play_circle`, `#EF4444`)
     4. `Belajar & Referensi` (`school`, `#3B82F6`)
     5. `Tempat & Jalan-jalan` (`place`, `#10B981`)
-- [ ] **Buat `app/Actions/Auth/AuthenticateGoogleUserAction.php` & `AuthController.php`:**
+- [x] **Buat `app/Actions/Auth/AuthenticateGoogleUserAction.php` & `AuthController.php`:**
   - Endpoint `POST /api/v1/auth/google`: Verifikasi `id_token` Google (atau info profil OAuth), buat user baru jika belum ada (`ai_quota_left = 10`), jalankan `SeedDefaultCollectionsAction` jika user baru, simpan `fcm_token`, dan kembalikan Sanctum Bearer Token beserta data user & daftar koleksinya.
   - Endpoint `GET /api/v1/auth/me`: Mengembalikan profil user terbaru + `meta` kuota AI.
   - Endpoint `DELETE /api/v1/auth/account`: Menghapus seluruh token Sanctum dan menghapus baris `user` (memicu `ON DELETE CASCADE` pada seluruh tabel terkait).
-- [ ] **Buat `app/Http/Controllers/Api/V1/CollectionController.php`:**
+- [x] **Buat `app/Http/Controllers/Api/V1/CollectionController.php`:**
   - `GET /api/v1/collections`: Daftar koleksi urut berdasarkan `sort_order` dengan `withCount('links')`.
   - `POST /api/v1/collections`: Cek apakah `!$user->isPro() && $user->collections()->count() >= 5`. Jika ya, lempar `BusinessLogicException('COLLECTION_LIMIT_REACHED', ..., 403)`.
   - `PATCH /api/v1/collections/{id}`: Jika mengubah `is_public = true`, cek apakah `!$user->isPro()` dan sudah punya 1 koleksi publik lain. Jika ya, lempar `BusinessLogicException('PUBLIC_COLLECTION_LIMIT_REACHED', ..., 403)`.
