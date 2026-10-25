@@ -1,0 +1,46 @@
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment & Local secrets
+.env
+.env.backup
+.env.production
+*.local
+
+# Laravel Backend
+tautin-backend/vendor/
+tautin-backend/node_modules/
+tautin-backend/public/storage/
+tautin-backend/storage/*.key
+tautin-backend/storage/oauth-*.key
+tautin-backend/storage/app/google-play-service-account.json
+tautin-backend/.env
+tautin-backend/.phpunit.result.cache
+
+# Flutter Mobile
+tautin-mobile/.dart_tool/
+tautin-mobile/.flutter-plugins
+tautin-mobile/.flutter-plugins-dependencies
+tautin-mobile/.packages
+tautin-mobile/build/
+tautin-mobile/.pub-cache/
+tautin-mobile/.pub/
+tautin-mobile/android/.gradle/
+tautin-mobile/android/local.properties
+tautin-mobile/android/key.properties
+tautin-mobile/android/app/*.keystore
+tautin-mobile/android/app/*.jks
+
+# Next.js Web
+tautin-web/.next/
+tautin-web/out/
+tautin-web/node_modules/
+tautin-web/.env*.local
