@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CollectionController;
+use App\Http\Controllers\Api\V1\LinkController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -13,6 +14,9 @@ Route::prefix('v1')->group(function (): void {
         // User profile & deletion
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::delete('/auth/account', [AuthController::class, 'deleteAccount']);
+
+        // Links Ingestion
+        Route::post('/links/quick-save', [LinkController::class, 'quickSave']);
 
         // Collections CRUD
         Route::get('/collections', [CollectionController::class, 'index']);

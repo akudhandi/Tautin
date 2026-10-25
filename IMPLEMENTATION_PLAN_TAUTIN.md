@@ -84,7 +84,7 @@
 **Tujuan Fase 2:** Membangun mesin pemroses tautan asinkron yang aman dari serangan SSRF, mampu mengekstrak metadata dari berbagai situs (TikTok, YouTube, Shopee, Artikel), dan merangkumnya menggunakan Gemini 2.5 Flash di latar belakang.
 
 ### 2.1 Keamanan SSRF & URL Canonicalizer
-- [ ] **Buat `app/Services/Scraper/SsrfGuard.php`:**
+- [x] **Buat `app/Services/Scraper/SsrfGuard.php`:**
   - Method `validateAndResolve(string $rawUrl): string`:
     - Pastikan skema hanya `http` atau `https` dan port hanya `80` atau `443`.
     - Resolusi host ke daftar IP menggunakan `gethostbynamel($host)`.
@@ -94,11 +94,11 @@
     - Kembalikan *clean canonical URL*.
 
 ### 2.2 Multi-Layer Metadata Scraper (Tier 1, Tier 2, Tier 3)
-- [ ] **Buat `app/Services/Scraper/OEmbedExtractor.php` (Tier 1):**
+- [x] **Buat `app/Services/Scraper/OEmbedExtractor.php` (Tier 1):**
   - Deteksi domain `tiktok.com`, `youtube.com`, `youtu.be`, `twitter.com`, `x.com`.
   - Panggil endpoint oEmbed resmi masing-masing platform (`timeout = 5s`).
   - Ekstrak `title`, `author_name`, dan `thumbnail_url`.
-- [ ] **Buat `app/Services/Scraper/HtmlDomExtractor.php` (Tier 2):**
+- [x] **Buat `app/Services/Scraper/HtmlDomExtractor.php` (Tier 2):**
   - Gunakan HTTP Client dengan header `User-Agent` Android Chrome modern dan `Accept-Language: id-ID,id;q=0.9,en-US;q=0.8`.
   - Pastikan header respons `Content-Type` mengandung `text/html` dan batasi pembacaan *stream* maksimal `1.5 MB`.
   - Gunakan `Symfony\Component\DomCrawler\Crawler` untuk mengekstrak:
@@ -106,26 +106,26 @@
     - `og:image` -> fallback ke `twitter:image` (ubah URL gambar relatif menjadi absolut).
     - `og:description` -> fallback ke `<meta name="description">`.
     - Bersihkan node `<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`, `<aside>`, lalu ambil teks bersih dari `<article>` atau `<main>` atau `<p>`, dan potong maksimal **3.000 karakter**.
-- [ ] **Buat `app/Services/Scraper/MultiLayerScraperService.php`:**
+- [x] **Buat `app/Services/Scraper/MultiLayerScraperService.php`:**
   - Menggabungkan Tier 1 (oEmbed) -> Tier 2 (HTML DOM) -> Tier 3 (Fallback ke `raw_description` bawaan Share Sheet & kata kunci dari *URL slug* jika Tier 1 & 2 terkena blokir HTTP 403/429/Captcha).
 
 ### 2.3 Integrasi Gemini 2.5 Flash (Structured JSON Output)
-- [ ] **Buat DTO `app/Services/AI/Data/AiAnalysisResult.php`:**
+- [x] **Buat DTO `app/Services/AI/Data/AiAnalysisResult.php`:**
   - Properti: `cleanTitle`, `summary`, `selectedCollectionName`, `tags` (array), `sourceType`.
-- [ ] **Buat `app/Services/AI/GeminiOrganizerService.php`:**
+- [x] **Buat `app/Services/AI/GeminiOrganizerService.php`:**
   - Panggil REST API `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`.
   - Masukkan daftar nama koleksi milik user (`$user->collections->pluck('name')`) ke dalam *prompt*.
   - Gunakan `responseMimeType: "application/json"` dan `responseSchema` ketat sesuai spesifikasi di `ARCHITECTURE.md`.
   - Tambahkan *try-catch* tangguh: jika Gemini API *timeout* atau error, kembalikan `null` agar proses penyimpanan link tetap selesai menggunakan metadata hasil *scraper*.
 
 ### 2.4 Endpoint Quick Save (`< 300ms`) & Background Job Queue
-- [ ] **Buat `app/Actions/Links/QuickSaveLinkAction.php`:**
+- [x] **Buat `app/Actions/Links/QuickSaveLinkAction.php`:**
   - Bersihkan URL awal dari spasi, ekstrak `domain`, dan hitung `url_hash = hash('sha256', $initialUrl)`.
   - Cek apakah sudah ada baris di tabel `links` dengan `user_id` dan `url_hash` tersebut:
     - **Jika Duplikat Ditemukan:** Update `updated_at = now()`, jangan potong kuota AI, kembalikan respons sukses dengan flag `is_duplicate: true` dan pesan *"Tautan sudah ada di Tautin, dinaikkan ke paling atas!"*
     - **Jika Tautan Baru:** Simpan ke tabel `links` dengan `status = 'pending'`, `raw_description`, dan `collection_id` (jika dipilih manual oleh user).
     - Dispatch `ProcessSharedLinkJob::dispatch($link->id)->onQueue('high')`.
-- [ ] **Buat `app/Jobs/ProcessSharedLinkJob.php`:**
+- [x] **Buat `app/Jobs/ProcessSharedLinkJob.php`:**
   1. Ubah `link->status = 'processing'`.
   2. Jalankan `SsrfGuard` untuk mendapatkan *canonical URL* (jika setelah *unshorten* ternyata `url_hash` baru sudah ada di database user tersebut, gabungkan/hapus baris baru dan perbarui baris lama).
   3. Jalankan `MultiLayerScraperService` untuk mendapatkan judul, *thumbnail*, deskripsi, dan teks isi.
