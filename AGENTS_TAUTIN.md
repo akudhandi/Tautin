@@ -28,11 +28,13 @@ Setiap AI Coding Agent yang bekerja di repositori ini **WAJIB** mematuhi 6 atura
 
 4. **Jaminan Kecepatan Simpan `< 300ms` (Asynchronous by Default):**
    * Endpoint `POST /api/v1/links/quick-save` **DILARANG KERAS** menjalankan *HTTP scraping* atau memanggil Gemini API secara sinkron di dalam siklus *HTTP Request*.
-   * Controller/Action hanya boleh melakukan validasi cepat, pengecekan duplikat via `url_hash`, menyimpan status `'pending'`, men-*dispatch* `ProcessSharedLinkJob` ke antrean (`queue: 'high'`), lalu langsung mengembalikan HTTP `201 Created`.
+   * Controller/Action hanya boleh melakukan validasi cepat, normalisasi URL via `SsrfGuard::normalizeUrlWithoutNetwork()`, pengecekan duplikat ganda via `url_hash` **ATAU** `raw_url_hash`, menyimpan status `'pending'`, men-*dispatch* `ProcessSharedLinkJob` ke antrean (`queue: 'high'`), lalu langsung mengembalikan HTTP `201 Created`.
 
-5. **Prinsip "Zero Failed Saves" (Ketahanan terhadap Blokir Scraper & Kuota Habis):**
+5. **Prinsip "Zero Failed Saves" & Pembagian Kuota yang Benar:**
+   * Yang memakan `ai_quota_left` **HANYA pembuatan Ringkasan AI (`ai_summary`)**. Menyimpan link, membersihkan judul, memilihkan folder (auto-folder), dan membuat tags (auto-tag) **gratis & tanpa batas** untuk semua paket.
    * Jika situs target (seperti Shopee, Tokopedia, atau Instagram) memblokir *scraper* (`HTTP 403/429/Captcha`), **jangan gagalkan penyimpanan link**. Gunakan teks bawaan `raw_description` dari *Share Intent* dan kata kunci pada *URL path* untuk dianalisis oleh AI.
-   * Jika Gemini API sedang *timeout* atau kuota AI bulanan pengguna gratis sudah habis (`ai_quota_left == 0`), **jangan blokir pengguna dari menyimpan link**. Tetap simpan link dengan judul dan gambar hasil *scraper* tanpa ringkasan AI (`is_ai_processed = false`).
+   * Jika kuota ringkasan AI habis (`ai_quota_left == 0`), **jangan blokir pengguna dari menyimpan link**. `ProcessSharedLinkJob` tetap menjalankan *scraper*, lalu memilihkan koleksi dengan **pencocokan kata kunci sederhana** (kata pada judul/domain tautan vs nama koleksi pengguna, *fallback* koleksi default pertama — tanpa memanggil Gemini), dan mengatur `ai_summary = null`, `is_ai_processed = false`, `status = 'completed'`.
+   * Di UI Flutter (`SmartLinkCard` dan *Quick Taut Bottom Sheet*), bila `ai_summary == null` pada link `completed`, tampilkan banner halus dengan teks baku: **"✨ Kuota ringkasan AI habis — Upgrade ke Pro"** (`AppConfig.aiQuotaExhaustedBanner`).
 
 6. **Kerahasiaan Data pada Koleksi Publik:**
    * Endpoint publik (`GET /api/v1/public/collections/{slug}`) dan halaman web Next.js (`/tautin/c/[slug]`) **DILARANG** mengekspos alamat `email` pemilik koleksi maupun isi kolom catatan pribadi (`user_notes`).
@@ -66,10 +68,17 @@ Seluruh respons API wajib menggunakan format amplop JSON berikut:
 
 **Respons Error Bisnis (`400`, `401`, `403`, `422`, `429`):**
 Gunakan `BusinessLogicException` untuk melempar `error_code` spesifik berikut agar aplikasi Flutter dapat memicu layar Paywall secara akurat:
-* `COLLECTION_LIMIT_REACHED` (HTTP `403`): User `free` mencoba membuat koleksi ke-6.
+* `COLLECTION_LIMIT_REACHED` (HTTP `403`): User `free` mencoba membuat **koleksi kustom ke-4** (`POST /collections` maupun clone koleksi publik). Pesan baku: *"Batas pembuatan koleksi kustom untuk akun Gratis (3 koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!"*
 * `PUBLIC_COLLECTION_LIMIT_REACHED` (HTTP `403`): User `free` mencoba mengaktifkan koleksi publik ke-2.
 * `PRO_REQUIRED_FOR_REMINDER` (HTTP `403`): User `free` mencoba mengisi kolom `remind_at`.
+* `PRO_REQUIRED_FOR_REGENERATE` (HTTP `403`): User `free` memanggil `POST /links/{id}/regenerate-ai` (fitur buat ulang ringkasan AI khusus Pro/Lifetime).
+* `PRO_REQUIRED_FOR_CUSTOM_SLUG` (HTTP `403`): User `free` mengirim bidang `slug` pada `PATCH /collections/{id}`.
+* `AI_QUOTA_EXCEEDED` (HTTP `403`): Kuota ringkasan AI pengguna (`ai_quota_left == 0`) habis saat regenerasi AI manual.
+* `COLLECTION_SLUG_TAKEN` (HTTP `422`): Slug kustom koleksi publik sudah dipakai koleksi lain.
+* `UNAUTHORIZED_WEBHOOK` (HTTP `401`): Secret RTDN salah/kosong pada `POST /webhooks/google-play-rtdn`.
 * `INVALID_PURCHASE_TOKEN` (HTTP `422`): Token Google Play tidak valid atau sudah diklaim oleh `user_id` lain.
+
+**Catatan kuota (wajib konsisten):** kuota `free` direset 10 setiap tanggal 1 pukul **00:01** (`monthlyOn(1, '00:01')`), `pro/fair-use` = 500. Ketika kuota habis, penyimpanan link tetap diperbolehkan (lihat Aturan Global #5) — kuota hanya memengaruhi `ai_summary`.
 
 ### 2.3 Aturan Keamanan SSRF & Scraper (`app/Services/Scraper/`)
 Saat membangun `SsrfGuard` dan `MultiLayerScraperService`:
@@ -112,6 +121,8 @@ Saat membangun `SsrfGuard` dan `MultiLayerScraperService`:
   * `tautin_pro_lifetime` (In-App Product / One-time purchase)
 * **Anti-Replay Attack:** Simpan `purchase_token_hash = hash('sha256', $purchaseToken)` sebagai kolom `UNIQUE` di tabel `subscriptions`. Tolak transaksi jika hash tersebut sudah terdaftar milik `user_id` yang berbeda.
 * **Wajib Acknowledge:** Setelah memverifikasi bahwa status pembelian valid di Google Play Developer API (`AndroidPublisher`), backend **wajib** memanggil fungsi `acknowledge()` jika status acknowledgement masih *pending*, guna mencegah *auto-refund* 3 hari dari Google Play.
+* **Pencabutan Refund (Voided Purchases):** `GooglePlayBillingService::getVoidedPurchaseTokens()` mengunduh daftar `purchaseToken` yang di-*refund* dari `purchases_voidedpurchases->listVoidedpurchases()`. Komando `tautin:sync-subscriptions` (per jam) mencocokkannya dengan tabel `subscriptions` — mencakup langganan `pro` **maupun** pembelian `lifetime` (`plan_expires_at = NULL`) — lalu: `subscriptions.status = 'refunded'`, pengguna turun `plan_type = 'free'` (`plan_expires_at = NULL`), dan `ai_quota_left = min(kuota saat ini, 10)` (tanpa pernah menaikkan kuota). Proses ini **idempoten** untuk baris yang sudah `refunded`.
+* **Webhook Real-Time (`POST /api/v1/webhooks/google-play-rtdn`):** Endpoint di dalam prefix `/api/v1` namun **di luar middleware Sanctum**, dilindungi *secret* `config('tautin.google_play.rtdn_secret')` dari env `GOOGLE_PLAY_RTDN_SECRET` (dikirim lewat query `?secret=...` atau header `X-RTDN-Secret`; salah/kosong → `401 UNAUTHORIZED_WEBHOOK`). Payload Pub/Sub berisi `message.data` berupa **base64 JSON**: tipe `subscriptionNotification` 1 (RECOVERED) / 2 (RENEWED) memverifikasi ulang & mengembalikan status Pro; tipe 3 (CANCELED) / 12 (REVOKED) / 13 (EXPIRED) serta `voidedPurchaseNotification` mencabut langganan terkait (refund). Endpoint selalu menjawab `202` agar Pub/Sub tidak mengulang push tanpa henti.
 
 ---
 
@@ -130,9 +141,11 @@ Saat membangun `SsrfGuard` dan `MultiLayerScraperService`:
    * Pisahkan URL pertama menggunakan Regex: `r'(https?:\/\/[^\s\)\]\>\"\'`]+)'` -> masukkan ke field `url`.
    * Sisa teks selain URL tersebut dimasukkan ke field `raw_description`.
 2. **UX `QuickTautBottomSheet` (< 2 Detik):**
+   * Tinggi sheet baku = **32% tinggi layar** (`maxHeight * 0.32`) dengan isi dibungkus `SingleChildScrollView` agar tidak *overflow* di layar kecil (banner kuota + *note editor* tetap terjangkau).
    * Begitu *Bottom Sheet* terbuka, langsung panggil `POST /api/v1/links/quick-save` secara otomatis.
-   * Tampilkan *progress countdown* selama **2 detik**. Jika pengguna tidak menyentuh layar dalam 2 detik, tutup aplikasi/sheet secara otomatis (`SystemNavigator.pop()`) agar pengguna langsung kembali ke aplikasi sebelumnya (TikTok/Shopee/IG).
+   * Tampilkan *progress countdown* selama **2 detik (`quickTautCountdown = Duration(seconds: 2)` / 2000ms)**. Jika pengguna tidak menyentuh layar dalam 2 detik, tutup aplikasi/sheet secara otomatis (`SystemNavigator.pop()`) agar pengguna langsung kembali ke aplikasi sebelumnya (TikTok/Shopee/IG).
    * Jika pengguna menyentuh pilihan koleksi atau tombol *"Tambah Catatan"*, batalkan *auto-close timer* dan kirim pembaruan melalui `PATCH /api/v1/links/{id}`.
+   * Bila link tersimpan dengan `aiSummary == null` (kuota ringkasan AI habis), tampilkan banner upsell `AppConfig.aiQuotaExhaustedBanner` di dalam sheet tanpa menghentikan alur simpan.
 
 ### 3.3 Sistem Desain & Komponen Visual (`tautin_theme.dart`)
 * **Warna Utama:** Electric Indigo (`#4F46E5`).
@@ -143,7 +156,8 @@ Saat membangun `SsrfGuard` dan `MultiLayerScraperService`:
 * **State pada `SmartLinkCard`:**
   * Jika `status == 'pending' || status == 'processing'`: Tampilkan animasi *shimmer* ungu lembut dengan teks *"✨ AI sedang merangkum tautan ini..."*
   * Jika `status == 'completed' && aiSummary != null`: Tampilkan kotak ungu `✨` berisi ringkasan AI (maksimal 2–3 baris di beranda, penuh di layar detail).
-  * Jika `status == 'completed' && aiSummary == null` (karena kuota AI gratis habis): Tampilkan tombol halus di dalam kartu: *"✨ Kuota ringkasan AI habis — Upgrade ke Pro"*.
+  * Jika `status == 'completed' && aiSummary == null` (karena kuota ringkasan AI habis saat link disimpan): Tampilkan banner halus di dalam kartu bertuliskan persis: *"✨ Kuota ringkasan AI habis — Upgrade ke Pro"* (gunakan konstanta `AppConfig.aiQuotaExhaustedBanner`, jangan teks literal).
+* Tombol **"Buat Ulang Ringkasan AI"** pada layar detail memanggil `POST /api/v1/links/{id}/regenerate-ai`: pengguna `free` menerima `403 PRO_REQUIRED_FOR_REGENERATE` → tampilkan `PaywallScreen`; kuota habis menerima `403 AI_QUOTA_EXCEEDED`; sukses mengubah status link kembali `pending` (_job di-*dispatch* ke antrean `high`).
 
 ### 3.4 Aturan Implementasi Native `in_app_purchase` (`billing`)
 * Dengarkan stream `InAppPurchase.instance.purchaseStream` sejak aplikasi dijalankan (di dalam provider global).
@@ -166,8 +180,8 @@ Seluruh rute web Tautin harus berada di bawah *basePath* `/tautin`:
 
 ### 4.2 Optimasi Viral Loop & OpenGraph pada `/tautin/c/[slug]`
 * Gunakan fungsi `generateMetadata()` di Next.js untuk menghasilkan meta tag OpenGraph dinamis dari API `GET /api/v1/public/collections/{slug}`:
-  * `title`: `"📂 [Nama Koleksi] ([Jumlah] Tautan) — Dirapikan oleh Tautin AI"`
-  * `description`: `"Kumpulan tautan pilihan oleh [Nama Pembuat] lengkap dengan ringkasan AI instan di Tautin."`
+  * `title`: `"📂 {collection.name} ({links_count} Tautan) — Dikurasi oleh {owner_name} di Tautin (Dirapikan oleh AI)"` (contoh: *"📂 Belanja & Wishlist (23 Tautan) — Dikurasi oleh Rani di Tautin (Dirapikan oleh AI)"*).
+  * `description`: `"Kumpulan tautan pilihan oleh {owner_name} lengkap dengan ringkasan AI instan di Tautin."`
   * `openGraph.images`: Gunakan `thumbnail_url` pertama yang valid dari daftar link di dalam koleksi tersebut.
 * Pasang *Sticky Bottom Banner* di layar web koleksi publik yang mengajak pengunjung mengunduh **Tautin** di Google Play Store atau membuka koleksi tersebut langsung di dalam aplikasi Tautin (via Android App Links).
 

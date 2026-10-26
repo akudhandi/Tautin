@@ -72,15 +72,16 @@ tautin/
 │   │   │   │   ├── SeedDefaultCollectionsAction.php
 │   │   │   │   └── DeleteUserAccountAction.php
 │   │   │   ├── Links/
-│   │   │   │   ├── QuickSaveLinkAction.php
+│   │   │   │   ├── QuickSaveLinkAction.php       # Normalisasi URL + dedup dual-hash (url_hash / raw_url_hash)
+│   │   │   │   ├── RegenerateAiAction.php        # Regenerasi ringkasan AI (khusus Pro; dispatch queue 'high')
 │   │   │   │   └── UpdateLinkAction.php
 │   │   │   └── Billing/
 │   │   │       └── VerifyGooglePlayPurchaseAction.php
 │   │   ├── Console/Commands/
-│   │   │   ├── ResetMonthlyAiQuotaCommand.php  # Jalan setiap tanggal 1 (00:00 WIB)
+│   │   │   ├── ResetMonthlyAiQuotaCommand.php  # Jalan setiap tanggal 1 (00:01 WIB)
 │   │   │   ├── DispatchLinkRemindersCommand.php# Jalan setiap menit
 │   │   │   ├── SendWeeklyDigestCommand.php     # Jalan setiap Sabtu (09:00 WIB)
-│   │   │   └── SyncExpiredSubscriptionsCommand.php # Jalan setiap jam
+│   │   │   └── SyncExpiredSubscriptionsCommand.php # Jalan setiap jam (+ sapuan Voided Purchases)
 │   │   ├── Exceptions/
 │   │   │   └── BusinessLogicException.php      # Exception standar dengan error_code
 │   │   ├── Http/
@@ -89,7 +90,8 @@ tautin/
 │   │   │   │   ├── LinkController.php
 │   │   │   │   ├── CollectionController.php
 │   │   │   │   ├── BillingController.php
-│   │   │   │   └── PublicCollectionController.php
+│   │   │   │   ├── PublicCollectionController.php
+│   │   │   │   └── GooglePlayRtdnController.php  # Webhook RTDN Google Play (Pub/Sub)
 │   │   │   ├── Requests/Api/V1/
 │   │   │   └── Resources/Api/V1/
 │   │   ├── Jobs/
@@ -207,7 +209,7 @@ CREATE TABLE collections (
     color VARCHAR(20) NOT NULL DEFAULT '#4F46E5',
     slug VARCHAR(120) NOT NULL UNIQUE,
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
-    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE, -- 5 koleksi bawaan signup ditandai is_default = TRUE; batas Free (3) hanya menghitung is_default = FALSE
     sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -225,7 +227,8 @@ CREATE TABLE links (
     user_id BIGINT UNSIGNED NOT NULL,
     collection_id BIGINT UNSIGNED NULL,
     url TEXT NOT NULL,
-    url_hash CHAR(64) NOT NULL, -- SHA-256 dari canonical URL untuk deteksi duplikat < 1ms
+    url_hash CHAR(64) NOT NULL, -- SHA-256 dari canonical URL (ditulis ulang setelah unshorten)
+    raw_url_hash CHAR(64) NULL, -- SHA-256 dari URL persis saat pertama di-share (biasanya shortlink); TIDAK PERNAH ditulis ulang oleh unshorten
     domain VARCHAR(100) NOT NULL,
     source_type ENUM('video', 'ecommerce', 'article', 'social', 'other') NOT NULL DEFAULT 'other',
     title VARCHAR(255) NULL,
@@ -244,9 +247,12 @@ CREATE TABLE links (
     CONSTRAINT fk_links_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_links_collection FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL,
     
-    -- Mencegah duplikasi URL yang sama pada satu akun pengguna
+    -- Mencegah duplikasi URL kanonik yang sama pada satu akun pengguna
     UNIQUE KEY uq_links_user_url_hash (user_id, url_hash),
-    
+
+    -- Index deteksi duplikat instan via shortlink (raw_url_hash)
+    INDEX idx_links_user_raw_hash (user_id, raw_url_hash),
+
     -- Index untuk query Feed utama (Pinned di atas, lalu urutan terbaru)
     INDEX idx_links_user_feed (user_id, is_pinned DESC, updated_at DESC),
     
@@ -317,10 +323,15 @@ Karena pengguna dapat mengirimkan URL apa saja, *scraper* rentan terhadap serang
 **Aturan Wajib `SsrfGuard`:**
 1. **Validasi Skema & Port:** Hanya izinkan skema `http` dan `https` pada port standar (`80` dan `443`).
 2. **Resolusi DNS & Pemblokiran IP Privat:** Sebelum melakukan request HTTP (dan pada setiap *hop redirect*), panggil `gethostbynamel($host)` lalu validasi setiap IP menggunakan `filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)`. Jika gagal, batalkan proses *scraping*.
-3. **Unshortening & Pembersihan Parameter Pelacak:**
+3. **Normalisasi Instan Tanpa Jaringan — `SsrfGuard::normalizeUrlWithoutNetwork(string $url): string` (statis, < 1ms):**
+   * Dipakai `QuickSaveLinkAction` **sebelum** menyimpan link agar deteksi duplikat konsisten.
+   * Memangkas seluruh spasi/whitespace di sekeliling URL, menurunkan huruf host ke *lowercase*, membuang parameter *tracking* (`utm_*`, `fbclid`, `igshid`, `gclid`, `_t`, `_r`), dan membuang `#fragment`.
+   * URL yang tidak memiliki skema/host valid melempar `UnsafeUrlException('Format URL tidak valid untuk normalisasi.')`.
+   * Baris baru menyimpan `url` bernilai URL ternormalisasi ini serta `url_hash = raw_url_hash = hash('sha256', $normalizedUrl)`.
+4. **Unshortening & Pembersihan Parameter Pelacak:**
    * Ikuti maksimal **5 kali HTTP Redirect** (`connect_timeout: 4s`, `timeout: 8s`) untuk mengurai *shortlink* seperti `vt.tiktok.com/...`, `id.shp.ee/...`, atau `bit.ly/...`.
    * Buang parameter *tracking* dari query string: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `fbclid`, `igshid`, `gclid`, `_t`, `_r`.
-   * Hitung ulang `url_hash = hash('sha256', $cleanCanonicalUrl)` setelah redirect selesai.
+   * Setelah redirect selesai, `ProcessSharedLinkJob` **menulis ulang `url` dan `url_hash` ke canonical URL** (`url_hash = hash('sha256', $cleanCanonicalUrl)`) tetapi **tidak pernah mengubah `raw_url_hash`** — jejak hash shortlink awal dipertahankan agar share ulang shortlink yang sama tetap terdeteksi duplikat secara instan.
 
 ### 4.2 Pipeline Multi-Layer Metadata Scraper (`MultiLayerScraperService.php`)
 Agar berhasil mengekstrak informasi dari berbagai platform yang sering memblokir bot:
@@ -342,7 +353,8 @@ Agar berhasil mengekstrak informasi dari berbagai platform yang sering memblokir
 
 ### 4.3 Arsitektur Integrasi Gemini AI (`GeminiOrganizerService.php`)
 
-* **Endpoint:** `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}`
+* **Endpoint (Tanpa API Key di URL):** `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`
+* **Keamanan API Key (Wajib!):** API key **TIDAK PERNAH** melewati query string (`?key=...` dilarang karena bocor ke log URL & *exception trace*). Kirimkan selalu lewat HTTP Header: `x-goog-api-key: {GEMINI_API_KEY}`.
 * **Payload Konfigurasi:**
   ```json
   {
@@ -424,13 +436,25 @@ Tanpa menggunakan RevenueCat, verifikasi transaksi dilakukan secara *Server-to-S
 
 > **Penting (Aturan 3 Hari Google Play):** Setiap pembelian di Google Play **wajib di-*acknowledge*** dalam waktu maksimal 3 hari. Jika tidak, Google Play akan melakukan *refund* otomatis. Karena itu, fungsi `acknowledge()` langsung dipanggil oleh backend Laravel saat memverifikasi token, ditambah pemanggilan `completePurchase()` di sisi Flutter.
 
-### 5.2 Sinkronisasi Perpanjangan & Kedaluwarsa Otomatis (`SyncExpiredSubscriptionsCommand.php`)
+### 5.2 Sinkronisasi Perpanjangan, Kedaluwarsa & Refund (`SyncExpiredSubscriptionsCommand.php`)
 Berjalan setiap **1 jam** melalui Laravel Scheduler:
 1. Ambil seluruh pengguna dengan `plan_type = 'pro'` dan `plan_expires_at <= NOW()`.
 2. Ambil `purchase_token` aktif terakhir milik pengguna tersebut dari tabel `subscriptions`.
 3. Panggil `purchases_subscriptionsv2->get('id.my.sengganglabs.tautin', $token)`:
    * **Jika diperpanjang otomatis oleh pengguna (`expiryTime` di Google > `NOW()`):** Perbarui `users.plan_expires_at` dan `subscriptions.expires_at` ke tanggal baru.
    * **Jika dibatalkan/kedaluwarsa (`SUBSCRIPTION_STATE_EXPIRED`):** Ubah `subscriptions.status = 'expired'`, turunkan `users.plan_type = 'free'`, dan set `users.ai_quota_left = 10`.
+4. **Sapuan Voided Purchases (`getVoidedPurchaseTokens()`):**
+   * Panggil `purchases_voidedpurchases->listVoidedpurchases($packageName)` lalu bandingkan daftar `purchaseToken` hasil *refund* dengan tabel `subscriptions` — mencakup langganan `pro` **maupun** pembelian `lifetime` (`plan_expires_at = NULL` tidak pernah terjaring pemeriksaan tanggal).
+   * Untuk setiap kecocokan belum diproses: `subscriptions.status = 'refunded'`, pengguna diturunkan `plan_type = 'free'`, `plan_expires_at = NULL`, dan `ai_quota_left = min(kuota saat ini, 10)` (tanpa kenaikan kuota).
+   * Proses ini **idempoten**: baris yang sudah `refunded` dilewati; kegagalan jaringan Google hanya melewati sapuan (fallback aman).
+
+### 5.3 Webhook Real-Time Developer Notifications (`POST /api/v1/webhooks/google-play-rtdn`)
+* **Autentikasi:** *secret* bersama dari `config('tautin.google_play.rtdn_secret')` (`GOOGLE_PLAY_RTDN_SECRET`), dikirim Google Cloud Pub/Sub lewat query `?secret=...` atau header `X-RTDN-Secret`. Salah/kosong -> `401 UNAUTHORIZED_WEBHOOK`.
+* **Payload:** push Pub/Sub berisi `message.data` berupa **base64 JSON**; handler meng-*decode* lalu memproses:
+  * `subscriptionNotification.subscriptionNotificationType` **1 (RECOVERED) / 2 (RENEWED)** -> verifikasi ulang langganan (`verifyAndAcknowledgeSubscription`), set `status = 'active'`, pemilik kembali `pro` dengan kuota 500.
+  * Tipe **3 (CANCELED) / 12 (REVOKED) / 13 (EXPIRED)** serta `voidedPurchaseNotification` -> jalur refund: `subscriptions.status = 'refunded'`, pengguna turun ke `free`, kuota `min(kuota saat ini, 10)`.
+  * `testNotification` hanya dicatat ke log.
+* **Acknowledge:** endpoint selalu menjawab `202` (bentuk sinyal Pub/Sub) untuk payload kosong/tidak terbaca agar push tidak diulang tanpa henti; stamping status pengguna dijalankan idempoten.
 
 ---
 
@@ -440,7 +464,7 @@ Berjalan setiap **1 jam** melalui Laravel Scheduler:
 Agar pengalaman menyimpan tautan terasa instan dan tidak menumpuk *instance* aplikasi ganda:
 
 ```xml
-<manifest xmlns:android="[http://schemas.android.com/apk/res/android](http://schemas.android.com/apk/res/android)"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="id.my.sengganglabs.tautin">
 
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -554,7 +578,7 @@ File ini diletakkan pada root domain `https://www.sengganglabs.my.id/.well-known
 
 ## 8. Spesifikasi Kontrak REST API (`api/v1`)
 
-Seluruh request (kecuali `/public/*` dan `/auth/google`) wajib menyertakan header:
+Seluruh request (kecuali `/public/*`, `/auth/google`, dan `/webhooks/google-play-rtdn` yang memakai *secret* RTDN) wajib menyertakan header:
 * `Accept: application/json`
 * `Authorization: Bearer {sanctum_token}`
 
@@ -565,30 +589,38 @@ Seluruh request (kecuali `/public/*` dan `/auth/google`) wajib menyertakan heade
 | `POST /api/v1/auth/google` | Login/Register dengan Google ID Token & buat 5 koleksi bawaan. | `{ "id_token": "...", "fcm_token": "..." }` |
 | `GET /api/v1/auth/me` | Ambil profil terbaru, status Pro, & sisa kuota AI. | - |
 | `DELETE /api/v1/auth/account` | Hapus akun & seluruh data pengguna secara permanen. | `{ "confirmation": "HAPUS" }` |
-| `POST /api/v1/links/quick-save` | Simpan link cepat dari Share Sheet (`< 300ms`). | `{ "url": "...", "raw_description": "...", "collection_id": null, "user_notes": null }` |
-| `GET /api/v1/links` | Ambil daftar link (Pagination + Filter + Search). | `?page=1&collection_id=2&source_type=video&tag=resep&is_read=0&search=ayam` |
-| `GET /api/v1/links/resurface` | Ambil 3 link acak yang belum dibaca (> 3 hari). | - |
+| `POST /api/v1/links/quick-save` | Simpan link cepat dari Share Sheet (`< 300ms`). URL dinormalisasi (`SsrfGuard::normalizeUrlWithoutNetwork`), duplikat dicek via `url_hash` **atau** `raw_url_hash`. | `{ "url": "...", "raw_description": "...", "collection_id": null, "user_notes": null }` |
+| `GET /api/v1/links` | Ambil daftar link (Pagination + Filter + Search). `collection_id=unassigned` -> link tanpa koleksi (`whereNull('collection_id')`). | `?page=1&collection_id=2|unassigned&source_type=video&tag=resep&is_read=0&search=ayam` |
+| `GET /api/v1/links/resurface` | Ambil 3 link acak belum dibaca (> 3 hari); mengembalikan `[]` bila kandidat < 3. | - |
+| `POST /api/v1/links/{id}/regenerate-ai` | Buat ulang ringkasan AI/folder/tags sebuah link (Khusus Pro/Lifetime; status kembali `pending` + dispatch `ProcessSharedLinkJob` ke antrean `high`). | - |
 | `GET /api/v1/links/{id}` | Ambil detail 1 link (untuk polling status AI / layar detail). | - |
 | `PATCH /api/v1/links/{id}` | Update koleksi, judul, catatan, pin, status baca, atau pengingat. | `{ "collection_id": 3, "title": "...", "user_notes": "...", "is_pinned": true, "is_read": true, "remind_at": "2026-10-30 19:00:00" }` |
 | `DELETE /api/v1/links/{id}` | Hapus 1 link. | - |
 | `GET /api/v1/collections` | Ambil semua koleksi pengguna beserta jumlah link (`links_count`). | - |
-| `POST /api/v1/collections` | Buat koleksi baru (Maks 5 untuk Free tier). | `{ "name": "Skripsi", "icon": "book", "color": "#3B82F6", "is_public": false }` |
-| `PATCH /api/v1/collections/{id}` | Edit nama, warna, ikon, atau status publik koleksi. | `{ "name": "...", "is_public": true }` |
+| `POST /api/v1/collections` | Buat koleksi kustom baru (Free: maks **3** koleksi kustom; 5 koleksi bawaan `is_default = true` tidak dihitung). | `{ "name": "Skripsi", "icon": "book", "color": "#3B82F6", "is_public": false }` |
+| `PATCH /api/v1/collections/{id}` | Edit nama, warna, ikon, atau status publik koleksi. Bidang opsional `slug` (Khusus Pro: `alpha_dash`, 3–100, unik) mengubah URL publik. | `{ "name": "...", "is_public": true, "slug": "skripsi-2026" }` |
 | `DELETE /api/v1/collections/{id}` | Hapus koleksi (link di dalamnya menjadi `collection_id = null`). | - |
 | `POST /api/v1/billing/verify-purchase` | Verifikasi struk Google Play & aktifkan paket Pro/Lifetime. | `{ "product_id": "tautin_pro_yearly", "purchase_token": "...", "order_id": "GPA..." }` |
 | `POST /api/v1/billing/restore` | Sinkronisasi ulang daftar token pembelian saat ganti HP. | `{ "purchases": [{ "product_id": "...", "purchase_token": "..." }] }` |
-| `GET /api/v1/public/collections/{slug}` | Ambil data koleksi publik untuk Next.js SSR (Tanpa Auth). | - |
-| `POST /api/v1/public/collections/{slug}/clone` | Simpan seluruh link dari koleksi publik orang lain ke akun sendiri. | - |
+| `GET /api/v1/public/collections/{slug}` | Ambil data koleksi publik untuk Next.js SSR (Tanpa Auth). OG title: `📂 {collection.name} ({links_count} Tautan) — Dikurasi oleh {owner_name} di Tautin (Dirapikan oleh AI)`. | - |
+| `POST /api/v1/public/collections/{slug}/clone` | Simpan seluruh link dari koleksi publik orang lain ke akun sendiri (Free tetap terikat batas 3 koleksi kustom). | - |
+| `POST /api/v1/webhooks/google-play-rtdn` | Webhook Pub/Sub Google Play RTDN (Tanpa Auth Sanctum; dilindungi *secret*). Menangani `subscriptionNotification` (tipe 1/2 pemulihan & pembaharuan; tipe 3/12/13 pencabutan) serta `voidedPurchaseNotification` (refund). | Payload Pub/Sub: `{ "message": { "data": "<base64 JSON>" } }` + `?secret=...` atau header `X-RTDN-Secret` |
 
 ### 8.2 Standar Kode Error Bisnis (`error_code`)
 Agar aplikasi Flutter tahu kapan harus memunculkan **Layar Paywall Tautin Pro**:
 
 | HTTP Status | `error_code` | Kondisi Pemicu | Aksi di Aplikasi Flutter |
 | :--- | :--- | :--- | :--- |
-| `403 Forbidden` | `COLLECTION_LIMIT_REACHED` | User `free` mencoba membuat koleksi ke-6. | Buka `PaywallScreen` dengan pesan: *"Upgrade ke Pro untuk membuat koleksi tanpa batas."* |
+| `403 Forbidden` | `COLLECTION_LIMIT_REACHED` | User `free` mencoba membuat koleksi kustom ke-4 (`POST /collections` atau clone koleksi publik). | Buka `PaywallScreen` dengan pesan: *"Upgrade ke Pro untuk membuat koleksi tanpa batas."* |
 | `403 Forbidden` | `PRO_REQUIRED_FOR_REMINDER` | User `free` mencoba mengisi `remind_at`. | Buka `PaywallScreen` dengan pesan: *"Pengingat jadwal kustom adalah fitur Tautin Pro."* |
+| `403 Forbidden` | `PRO_REQUIRED_FOR_REGENERATE` | User `free` memanggil `POST /links/{id}/regenerate-ai`. | Buka `PaywallScreen` dengan pesan: *"Fitur buat ulang ringkasan AI khusus untuk pengguna Tautin Pro."* |
+| `403 Forbidden` | `PRO_REQUIRED_FOR_CUSTOM_SLUG` | User `free` mengirim bidang `slug` pada `PATCH /collections/{id}`. | Buka `PaywallScreen` dengan pesan: *"Fitur kustomisasi tautan publik khusus untuk pengguna Tautin Pro."* |
 | `403 Forbidden` | `PUBLIC_COLLECTION_LIMIT_REACHED` | User `free` mengaktifkan koleksi publik ke-2. | Buka `PaywallScreen` dengan pesan: *"Bagikan koleksi tanpa batas dengan Tautin Pro."* |
+| `403 Forbidden` | `AI_QUOTA_EXCEEDED` | Kuota ringkasan AI (`ai_quota_left == 0`) habis saat regenerasi AI manual. | Buka `PaywallScreen` dengan pesan: *"Kuota ringkasan AI bulanan Anda telah habis."* |
 | `422 Unprocessable` | `INVALID_PURCHASE_TOKEN` | Token Google Play tidak valid / sudah dipakai akun lain. | Tampilkan pesan gagal verifikasi pembayaran. |
+| `422 Unprocessable` | `VALIDATION_ERROR` | Error validasi FormRequest (termasuk `DELETE /auth/account` tanpa `{"confirmation": "HAPUS"}` dan `slug` yang gagal `alpha_dash`/unik). | Tampilkan pesan per-field dari `errors`. |
+| `422 Unprocessable` | `COLLECTION_SLUG_TAKEN` | Slug kustom sudah dipakai koleksi lain. | Tampilkan pesan: *"Slug sudah dipakai koleksi lain. Pilih slug lain."* |
+| `401 Unauthorized` | `UNAUTHORIZED_WEBHOOK` | Secret RTDN salah/kosong pada `POST /webhooks/google-play-rtdn`. | (Internal — tidak relevan di aplikasi; push Pub/Sub akan di-retry oleh Google). |
 | `429 Too Many Requests` | `RATE_LIMIT_EXCEEDED` | Mengirim > 30 request simpan link per menit. | Tampilkan *toast* peringatan batas kecepatan. |
 
 ---
@@ -605,7 +637,7 @@ Untuk memastikan seluruh fitur otomatis berjalan tepat waktu di server produksi:
    * `Schedule::command('tautin:dispatch-reminders')->everyMinute();`
      *(Mencari link dengan `remind_at <= NOW()` dan `reminder_sent = false`, mengirim FCM Push Notification, lalu mengubah `reminder_sent = true`).*
    * `Schedule::command('tautin:sync-subscriptions')->hourly();`
-     *(Mengecek masa berlaku langganan yang jatuh tempo ke Google Play Developer API).*
+     *(Mengecek masa berlaku langganan yang jatuh tempo ke Google Play Developer API dan menyapu Voided Purchases untuk mencabut langganan/beli-langsung `lifetime` yang di-refund — `subscriptions.status = 'refunded'`, pengguna turun ke `free`, kuota `min(kuota saat ini, 10)`).*
    * `Schedule::command('tautin:send-weekly-digest')->weeklyOn(6, '09:00');`
      *(Setiap hari Sabtu jam 09:00 WIB, mengirim rekap pengingat untuk pengguna yang memiliki >= 3 link belum dibaca).*
    * `Schedule::command('tautin:reset-monthly-quota')->monthlyOn(1, '00:01');`

@@ -11,16 +11,23 @@ class CreateCollectionAction
     /**
      * Create a new collection for user respecting tier limits.
      *
+     * The 5 default collections (`is_default = true`) seeded on signup are
+     * free. This limit only counts user-created custom collections
+     * (`is_default = false`), so a free user can end up with at most
+     * 5 default + 3 custom collections.
+     *
      * @param  array{name: string, icon?: ?string, color?: ?string, is_public?: ?bool}  $data
      */
     public function execute(User $user, array $data): Collection
     {
-        $maxCollections = (int) config('tautin.free_plan.max_collections', 5);
+        $maxCustomCollections = (int) config('tautin.free_plan.max_custom_collections', 3);
 
-        if (! $user->isPro() && $user->collections()->count() >= $maxCollections) {
+        if (! $user->isPro()
+            && $user->collections()->where('is_default', false)->count() >= $maxCustomCollections
+        ) {
             throw new BusinessLogicException(
                 errorCode: 'COLLECTION_LIMIT_REACHED',
-                message: 'Batas maksimal '.$maxCollections.' koleksi tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas.',
+                message: 'Batas pembuatan koleksi kustom untuk akun Gratis ('.$maxCustomCollections.' koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!',
                 httpStatus: 403
             );
         }

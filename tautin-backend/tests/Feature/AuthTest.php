@@ -81,6 +81,28 @@ class AuthTest extends TestCase
         $this->assertCount(5, $user->collections);
     }
 
+    public function test_delete_account_fails_without_confirmation_field(): void
+    {
+        $user = User::create([
+            'name' => 'Faro',
+            'email' => 'faro@example.com',
+            'google_id' => 'google_sub_106',
+        ]);
+
+        $token = $user->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->deleteJson('/api/v1/auth/account', []);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'VALIDATION_ERROR',
+            ]);
+
+        $this->assertDatabaseHas('users', ['id' => $user->id]);
+    }
+
     public function test_get_current_user_profile(): void
     {
         $user = User::create([

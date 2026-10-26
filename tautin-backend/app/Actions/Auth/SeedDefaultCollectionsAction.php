@@ -23,25 +23,25 @@ class SeedDefaultCollectionsAction
             'name' => 'Resep & Kuliner',
             'icon' => 'restaurant',
             'color' => '#F59E0B',
-            'is_default' => false,
+            'is_default' => true,
         ],
         [
             'name' => 'Tontonan & Hiburan',
             'icon' => 'play_circle',
             'color' => '#EF4444',
-            'is_default' => false,
+            'is_default' => true,
         ],
         [
             'name' => 'Belajar & Referensi',
             'icon' => 'school',
             'color' => '#3B82F6',
-            'is_default' => false,
+            'is_default' => true,
         ],
         [
             'name' => 'Tempat & Jalan-jalan',
             'icon' => 'place',
             'color' => '#10B981',
-            'is_default' => false,
+            'is_default' => true,
         ],
     ];
 

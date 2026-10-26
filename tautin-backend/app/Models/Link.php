@@ -21,6 +21,7 @@ class Link extends Model
         'collection_id',
         'url',
         'url_hash',
+        'raw_url_hash',
         'domain',
         'source_type',
         'title',

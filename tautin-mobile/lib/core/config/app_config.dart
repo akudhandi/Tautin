@@ -29,6 +29,11 @@ class AppConfig {
   /// Quick Taut auto close countdown (spec: opens app < 2 seconds).
   static const Duration quickTautCountdown = Duration(seconds: 2);
 
+  /// Upsell banner shown on Smart Link Cards when a link was saved with an
+  /// empty AI summary because the monthly summary quota was exhausted.
+  static const String aiQuotaExhaustedBanner =
+      '✨ Kuota ringkasan AI habis — Upgrade ke Pro';
+
   /// Package name used by Google Play Billing.
   static const String packageName = 'id.my.sengganglabs.tautin';
 }

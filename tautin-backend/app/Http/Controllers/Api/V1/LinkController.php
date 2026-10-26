@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Links\QuickSaveLinkAction;
+use App\Actions\Links\RegenerateAiAction;
 use App\Actions\Links\UpdateLinkAction;
+use App\Exceptions\BusinessLogicException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\QuickSaveLinkRequest;
 use App\Http\Requests\Api\V1\UpdateLinkRequest;
@@ -58,9 +60,16 @@ class LinkController extends Controller
             }
         }
 
-        // 2. Collection filter
+        // 2. Collection filter (`?collection_id=unassigned` returns links with
+        //    no folder, shown on the "📦 Tanpa Koleksi" tab in Flutter)
         if ($request->filled('collection_id')) {
-            $query->where('collection_id', $request->integer('collection_id'));
+            $collectionFilter = (string) $request->input('collection_id');
+
+            if ($collectionFilter === 'unassigned') {
+                $query->whereNull('collection_id');
+            } elseif (is_numeric($collectionFilter)) {
+                $query->where('collection_id', (int) $collectionFilter);
+            }
         }
 
         // 3. Source Type filter
@@ -94,16 +103,28 @@ class LinkController extends Controller
 
     /**
      * Resurface up to 3 random unread links older than 3 days.
+     *
+     * Per PRD `FR-REM-01`: the carousel only appears when the user owns at
+     * least 3 eligible links; otherwise an empty list is returned so the
+     * Flutter home screen hides the section entirely.
      */
     public function resurface(Request $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
 
-        $resurfaced = $user->links()
+        $query = $user->links()
             ->where('is_read', false)
-            ->where('created_at', '<=', now()->subDays(3))
-            ->inRandomOrder()
+            ->where('created_at', '<=', now()->subDays(3));
+
+        if ((clone $query)->count() < 3) {
+            return $this->successResponse(
+                data: [],
+                message: 'Daftar tautan untuk dibaca ulang berhasil dimuat.'
+            );
+        }
+
+        $resurfaced = $query->inRandomOrder()
             ->limit(3)
             ->with(['collection', 'tags'])
             ->get();
@@ -132,6 +153,29 @@ class LinkController extends Controller
             code: $result['is_duplicate'] ? 200 : 201,
             meta: [
                 'is_duplicate' => $result['is_duplicate'],
+                'ai_quota_left' => $user->ai_quota_left,
+                'plan_type' => $user->plan_type,
+            ]
+        );
+    }
+
+    /**
+     * Regenerate the AI summary, folder, and tags of a link (Pro/Lifetime only).
+     *
+     * @throws BusinessLogicException
+     */
+    public function regenerateAi(Request $request, int $id, RegenerateAiAction $regenerateAction): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        /** @var Link $link */
+        $link = $regenerateAction->execute($user, $id);
+
+        return $this->successResponse(
+            data: $link,
+            message: 'Ringkasan AI akan dibuat ulang. Cek kembali beberapa saat lagi.',
+            meta: [
                 'ai_quota_left' => $user->ai_quota_left,
                 'plan_type' => $user->plan_type,
             ]

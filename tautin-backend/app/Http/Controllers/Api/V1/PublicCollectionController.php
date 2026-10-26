@@ -72,12 +72,16 @@ class PublicCollectionController extends Controller
             );
         }
 
-        // Tier limit check for free users
-        $maxCollections = (int) config('tautin.free_plan.max_collections', 5);
-        if (! $user->isPro() && $user->collections()->count() >= $maxCollections) {
+        // Tier limit check for free users: only custom collections count, so a
+        // free user can always keep their 5 default collections plus up to
+        // `max_custom_collections` self-made folders.
+        $maxCustomCollections = (int) config('tautin.free_plan.max_custom_collections', 3);
+        if (! $user->isPro()
+            && $user->collections()->where('is_default', false)->count() >= $maxCustomCollections
+        ) {
             throw new BusinessLogicException(
                 errorCode: 'COLLECTION_LIMIT_REACHED',
-                message: 'Batas maksimal '.$maxCollections.' koleksi tercapai. Upgrade ke Tautin Pro untuk menyalin koleksi ini.',
+                message: 'Batas pembuatan koleksi kustom untuk akun Gratis ('.$maxCustomCollections.' koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!',
                 httpStatus: 403
             );
         }

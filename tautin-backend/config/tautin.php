@@ -2,7 +2,10 @@
 
 return [
     'free_plan' => [
-        'max_collections' => 5,
+        // 5 default (is_default = true) collections are seeded on signup and are
+        // free-of-charge. The limit below only counts user-created custom
+        // collections (is_default = false).
+        'max_custom_collections' => 3,
         'max_public_collections' => 1,
         'monthly_ai_quota' => 10,
     ],
@@ -17,6 +20,9 @@ return [
             'tautin_pro_lifetime',
         ],
         'service_account_path' => env('GOOGLE_PLAY_SERVICE_ACCOUNT_PATH', storage_path('app/google-play-service-account.json')),
+        // Shared secret required by the Pub/Sub RTDN push endpoint
+        // (query param `?secret=` or `X-RTDN-Secret` header).
+        'rtdn_secret' => env('GOOGLE_PLAY_RTDN_SECRET'),
     ],
     'gemini' => [
         'model' => 'gemini-2.5-flash',

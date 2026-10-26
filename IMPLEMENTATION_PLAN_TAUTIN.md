@@ -23,12 +23,13 @@
     - `symfony/dom-crawler` & `symfony/css-selector` (Parsing HTML & OpenGraph untuk *Scraper*)
 - [x] **Buat File Konfigurasi Bisnis (`config/tautin.php`):**
   - Definisikan konstanta bisnis agar tidak *hardcoded* di dalam *controller*:
-    - `free_plan.max_collections` = `5`
+    - `free_plan.max_custom_collections` = `3` (5 koleksi bawaan `is_default = true` tidak dihitung)
     - `free_plan.max_public_collections` = `1`
     - `free_plan.monthly_ai_quota` = `10`
     - `pro_plan.fair_use_monthly_ai_quota` = `500`
     - `google_play.package_name` = `'id.my.sengganglabs.tautin'`
     - `google_play.products` = `['tautin_pro_monthly', 'tautin_pro_yearly', 'tautin_pro_lifetime']`
+    - `google_play.rtdn_secret` = dari env `GOOGLE_PLAY_RTDN_SECRET` (proteksi webhook Pub/Sub `POST /webhooks/google-play-rtdn`)
     - `gemini.model` = `'gemini-2.5-flash'`
 
 ### 1.2 Standarisasi Respons API & Penanganan Error
@@ -45,7 +46,7 @@
 - [x] **Buat & Jalankan 5 Migrasi Utama (Sesuai DDL di `ARCHITECTURE.md`):**
   1. `database/migrations/xxxx_create_users_table.php` (Kolom: `id`, `name`, `email`, `google_id`, `avatar`, `plan_type`, `plan_expires_at`, `ai_quota_left`, `fcm_token`, timestamps + index).
   2. `database/migrations/xxxx_create_collections_table.php` (Kolom: `id`, `user_id`, `name`, `icon`, `color`, `slug`, `is_public`, `is_default`, `sort_order`, timestamps + foreign key cascade).
-  3. `database/migrations/xxxx_create_links_table.php` (Kolom: `id`, `user_id`, `collection_id`, `url`, `url_hash`, `domain`, `source_type`, `title`, `thumbnail_url`, `raw_description`, `ai_summary`, `user_notes`, `status`, `is_ai_processed`, `is_pinned`, `is_read`, `remind_at`, `reminder_sent`, timestamps + `UNIQUE(user_id, url_hash)` + `FULLTEXT(title, ai_summary, user_notes)`).
+  3. `database/migrations/xxxx_create_links_table.php` (Kolom: `id`, `user_id`, `collection_id`, `url`, `url_hash`, `raw_url_hash` (CHAR(64) NULL — hash URL shortlink awal sebelum unshorten), `domain`, `source_type`, `title`, `thumbnail_url`, `raw_description`, `ai_summary`, `user_notes`, `status`, `is_ai_processed`, `is_pinned`, `is_read`, `remind_at`, `reminder_sent`, timestamps + `UNIQUE(user_id, url_hash)` + `INDEX(user_id, raw_url_hash)` + `FULLTEXT(title, ai_summary, user_notes)`).
   4. `database/migrations/xxxx_create_tags_tables.php` (Tabel `tags` dan tabel pivot `link_tag`).
   5. `database/migrations/xxxx_create_subscriptions_table.php` (Kolom: `id`, `user_id`, `product_id`, `purchase_token`, `purchase_token_hash`, `order_id`, `status`, `starts_at`, `expires_at`, `last_verified_at`, timestamps).
 - [x] **Buat Model Eloquent & Relasinya (`app/Models/`):**
@@ -56,7 +57,7 @@
 
 ### 1.4 Autentikasi Google, Onboarding Seeder & Manajemen Koleksi
 - [x] **Buat `app/Actions/Auth/SeedDefaultCollectionsAction.php`:**
-  - Membuat 5 koleksi default untuk user baru:
+  - Membuat 5 koleksi bawaan untuk user baru — **semuanya ditandai `is_default = true`** sehingga tidak pernah memakan slot koleksi kustom (batas Free hanya menghitung `is_default = false`):
     1. `Belanja & Wishlist` (`shopping_bag`, `#EC4899`)
     2. `Resep & Kuliner` (`restaurant`, `#F59E0B`)
     3. `Tontonan & Hiburan` (`play_circle`, `#EF4444`)
@@ -68,14 +69,14 @@
   - Endpoint `DELETE /api/v1/auth/account`: Menghapus seluruh token Sanctum dan menghapus baris `user` (memicu `ON DELETE CASCADE` pada seluruh tabel terkait).
 - [x] **Buat `app/Http/Controllers/Api/V1/CollectionController.php`:**
   - `GET /api/v1/collections`: Daftar koleksi urut berdasarkan `sort_order` dengan `withCount('links')`.
-  - `POST /api/v1/collections`: Cek apakah `!$user->isPro() && $user->collections()->count() >= 5`. Jika ya, lempar `BusinessLogicException('COLLECTION_LIMIT_REACHED', ..., 403)`.
+  - `POST /api/v1/collections`: Cek apakah `!$user->isPro() && $user->collections()->where('is_default', false)->count() >= 3`. Jika ya, lempar `BusinessLogicException('COLLECTION_LIMIT_REACHED', 'Batas pembuatan koleksi kustom untuk akun Gratis (3 koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!', 403)`. Aturan sama berlaku untuk clone koleksi publik (`POST /public/collections/{slug}/clone`).
   - `PATCH /api/v1/collections/{id}`: Jika mengubah `is_public = true`, cek apakah `!$user->isPro()` dan sudah punya 1 koleksi publik lain. Jika ya, lempar `BusinessLogicException('PUBLIC_COLLECTION_LIMIT_REACHED', ..., 403)`.
   - `DELETE /api/v1/collections/{id}`: Hapus koleksi.
 
 > ### ✅ Verification & Definition of Done (Phase 1)
 > 1. Jalankan `php artisan migrate:fresh` tanpa error; pastikan indeks `FULLTEXT` dan `uq_links_user_url_hash` terbentuk di MySQL.
 > 2. Hit `POST /api/v1/auth/google` untuk user baru -> pastikan otomatis terbuat 5 baris di tabel `collections`.
-> 3. Dengan akun `plan_type = 'free'`, coba buat koleksi ke-6 via `POST /api/v1/collections` -> pastikan API menolak dengan HTTP `403` dan `error_code: "COLLECTION_LIMIT_REACHED"`.
+> 3. Dengan akun `plan_type = 'free'`, coba buat **koleksi kustom ke-4** via `POST /api/v1/collections` -> pastikan API menolak dengan HTTP `403` dan `error_code: "COLLECTION_LIMIT_REACHED"` (5 koleksi bawaan `is_default = true` tidak ikut dihitung).
 
 ---
 
@@ -261,14 +262,15 @@
 
 ### 5.1 Layar Beranda, Smart Link Card & Pencarian
 - [ ] **Buat Widget `lib/shared/widgets/smart_link_card.dart`:**
-  - Menampilkan favicon & nama domain, waktu simpan, *badge* pin, gambar *thumbnail* (dengan ikon ▶ untuk `video` atau 🛒 untuk `ecommerce`), judul bersih (maks 2 baris), kotak ungu lembut **`✨ Ringkasan AI`** (atau tombol ajakan *upgrade* jika kuota AI habis saat link tersebut disimpan), label nama Koleksi, dan deretan `#tags`.
+  - Menampilkan favicon & nama domain, waktu simpan, *badge* pin, gambar *thumbnail* (dengan ikon ▶ untuk `video` atau 🛒 untuk `ecommerce`), judul bersih (maks 2 baris), kotak ungu lembut **`✨ Ringkasan AI`**, label nama Koleksi, dan deretan `#tags`.
+  - Bila link tersimpan tanpa ringkasan karena kuota habis (`ai_summary == null`), kotak ringkasan digantikan banner halus bertuliskan **`✨ Kuota ringkasan AI habis — Upgrade ke Pro`** (konstanta `AppConfig.aiQuotaExhaustedBanner`); penyimpanan tetap sukses (prinsip *No Hard-Block*).
   - Jika `status` link masih `'pending'` atau `'processing'`, tampilkan efek *shimmer* halus pada kotak ringkasan AI dan lakukan *polling* ringan setelah 4 detik untuk memperbarui kartu secara otomatis.
 - [ ] **Buat `lib/features/home_feed/presentation/home_screen.dart`:**
   - **App Bar:** Logo Tautin + *Chip Indikator Kuota* di kanan atas (`✨ AI: 8/10` untuk Free, atau `👑 PRO` untuk pelanggan Pro/Lifetime).
   - **Clipboard Detector Banner:** Saat aplikasi dibuka (`AppLifecycleState.resumed`), cek `Clipboard.getData('text/plain')`. Jika berisi URL yang belum ada di feed terbaru, tampilkan *banner* kecil untuk menyimpannya dalam 1 klik.
   - **Search Bar:** Pencarian *debounced* (400ms) yang memanggil `GET /api/v1/links?search=...`.
-  - **Resurfacing Carousel:** Bagian *"Belum Dibaca Minggu Ini"* (tampil jika `GET /api/v1/links/resurface` mengembalikan data).
-  - **Filter Chips:** Filter cepat berdasarkan Koleksi maupun `source_type` (`Semua`, `🎬 Video`, `🛒 Belanja`, `📄 Artikel`).
+  - **Resurfacing Carousel:** Bagian *"Belum Dibaca Minggu Ini"* — hanya ditampilkan ketika `GET /api/v1/links/resurface` mengembalikan isi; bila kandidat belum dibaca < 3 link, API mengembalikan `[]` dan section ini disembunyikan seluruhnya.
+  - **Filter Chips:** Filter cepat berdasarkan Koleksi maupun `source_type` (`Semua`, `🎬 Video`, `🛒 Belanja`, `📄 Artikel`, `👀 Belum Dibaca`, `📦 Tanpa Koleksi` — chip terakhir memanggil `GET /api/v1/links?collection_id=unassigned`).
 
 ### 5.2 Layar Detail Tautan & Pengingat Pintar
 - [ ] **Buat `lib/features/link_detail/presentation/link_detail_screen.dart`:**
@@ -283,7 +285,7 @@
   - Menampilkan *Grid* 2 kolom berisi seluruh folder koleksi user + tombol **"+ Buat Koleksi"**.
   - Di dalam halaman isi koleksi, sediakan tombol **"🌐 Bagikan Koleksi"**:
     - Menampilkan *switch toggle* **"Aktifkan Link Publik"**.
-    - Saat aktif, tampilkan URL `https://www.sengganglabs.my.id/tautin/c/{slug}` dengan tombol **Salin Link** dan **Bagikan ke WhatsApp/Sosmed** (`share_plus`).
+    - Saat aktif, tampilkan URL `https://www.sengganglabs.my.id/tautin/c/{slug}` dengan tombol **Salin Link** dan **Bagikan ke WhatsApp/Sosmed** (`share_plus`) serta tombol **"Kustomisasi Slug"** yang memanggil `PATCH /api/v1/collections/{id}` dengan bidang `slug` (`alpha_dash`, 3–100 karakter, unik) — khusus Pro/Lifetime; pengguna gratis mendapat `403 PRO_REQUIRED_FOR_CUSTOM_SLUG` dan diarahkan ke `PaywallScreen`.
 
 ### 5.4 Integrasi Native Google Play Billing (`in_app_purchase`) & Paywall Screen
 - [ ] **Buat `lib/features/billing/data/native_iap_service.dart`:**
@@ -300,8 +302,9 @@
 
 > ### ✅ Verification & Definition of Done (Phase 5)
 > 1. Pastikan seluruh alur navigasi (Beranda, Pencarian, Detail Link, Koleksi, Pengaturan) berjalan mulus pada mode Terang (*Light*) dan Gelap (*Dark*).
-> 2. Coba tambahkan koleksi ke-6 atau tekan tombol *Pasang Pengingat* menggunakan akun Gratis -> pastikan `PaywallScreen` muncul dengan harga asli yang ditarik dari Google Play.
+> 2. Coba tambahkan **koleksi kustom ke-4** (atau tekan tombol *Pasang Pengingat* dan tombol *Buat Ulang Ringkasan AI*) menggunakan akun Gratis -> pastikan `PaywallScreen` muncul dengan harga asli yang ditarik dari Google Play.
 > 3. Uji tombol **"Buka Tautan Asli"** pada kartu TikTok/Shopee -> pastikan langsung membuka aplikasi terkait dan status kartu berubah menjadi sudah dibaca (`is_read = true`).
+> 4. Sisi backend: jalankan `tautin:sync-subscriptions` dan simulasikan refund (Voided Purchases / push ke `POST /api/v1/webhooks/google-play-rtdn` dengan secret `GOOGLE_PLAY_RTDN_SECRET`) -> pastikan langganan berubah `refunded`, pengguna turun ke `free`, dan `ai_quota_left = min(kuota saat ini, 10)` (mencakup pembelian `lifetime`).
 
 ---
 

@@ -80,10 +80,14 @@ class GeminiOrganizerService
         ];
 
         $model = config('tautin.gemini.model', 'gemini-2.5-flash');
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent';
 
         try {
-            $response = Http::withOptions([
+            // The API key is sent via the `x-goog-api-key` header so it can
+            // never leak into URL logs or exception traces.
+            $response = Http::withHeaders([
+                'x-goog-api-key' => $apiKey,
+            ])->withOptions([
                 'timeout' => 12,
                 'connect_timeout' => 4,
             ])->post($endpoint, $payload);

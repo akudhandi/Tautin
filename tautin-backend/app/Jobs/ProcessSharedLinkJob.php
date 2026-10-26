@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Exceptions\UnsafeUrlException;
+use App\Models\Collection;
 use App\Models\Link;
 use App\Models\Tag;
+use App\Models\User;
 use App\Services\AI\GeminiOrganizerService;
 use App\Services\Scraper\MultiLayerScraperService;
 use App\Services\Scraper\SsrfGuard;
@@ -134,6 +136,17 @@ class ProcessSharedLinkJob implements ShouldQueue
                     $link->tags()->sync($tagIds);
                 }
             }
+        } elseif ($user && $link->collection_id === null) {
+            // AI summary quota exhausted (ai_quota_left == 0): saving stays free
+            // and unlimited. Pick the folder with a simple keyword match on the
+            // scraped title + domain against the user's collection names. The
+            // link completes with `ai_summary = null` & `is_ai_processed = false`
+            // so the Flutter card can show the "upgrade" banner.
+            $matched = $this->matchCollectionByKeywords($user, $metadata->title, $link->domain);
+
+            if ($matched) {
+                $link->collection_id = $matched->id;
+            }
         }
 
         // 4. Fallback default collection if still unassigned
@@ -174,5 +187,39 @@ class ProcessSharedLinkJob implements ShouldQueue
         if ($aiApplied && $user) {
             $user->decrement('ai_quota_left');
         }
+    }
+
+    /**
+     * Simple (free, no-AI) auto-folder matching: compares significant words of
+     * the collection names against the scraped title and link domain.
+     *
+     * Returns null when nothing matches, letting the caller fall back to the
+     * user's first default collection.
+     */
+    protected function matchCollectionByKeywords(User $user, ?string $title, string $domain): ?Collection
+    {
+        $haystack = mb_strtolower(($title ?? '').' '.$domain);
+
+        $collections = $user->collections()
+            ->orderByDesc('is_default')
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($collections as $collection) {
+            $tokens = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($collection->name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            $significantTokens = array_values(array_filter(
+                $tokens,
+                fn (string $token): bool => mb_strlen($token) >= 4
+            ));
+
+            foreach ($significantTokens as $token) {
+                if (str_contains($haystack, $token)) {
+                    return $collection;
+                }
+            }
+        }
+
+        return null;
     }
 }

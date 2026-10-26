@@ -59,9 +59,9 @@ Pengguna smartphone di Indonesia mengonsumsi ratusan konten setiap hari dari ber
   * `AC-2`: Jika akun sudah terdaftar, sistem langsung mengembalikan token sesi (Laravel Sanctum) dan memuat data pengguna.
 
 #### `FR-AUTH-02`: Seeding Koleksi Bawaan (Zero-Blank-State Onboarding)
-* **Deskripsi:** Pengguna baru tidak boleh dihadapkan pada aplikasi kosong yang membingungkan. Saat registrasi pertama, sistem otomatis membuatkan 5 koleksi (*folder*) bawaan.
+* **Deskripsi:** Pengguna baru tidak boleh dihadapkan pada aplikasi kosong yang membingungkan. Saat registrasi pertama, sistem otomatis membuatkan 5 koleksi (*folder*) bawaan yang seluruhnya ditandai `is_default = true` (tidak pernah memakan slot koleksi kustom pengguna).
 * **Kriteria Penerimaan:**
-  * `AC-1`: Lima koleksi berikut otomatis dibuat untuk user baru:
+  * `AC-1`: Lima koleksi berikut otomatis dibuat untuk user baru (semua `is_default = true`):
     1. `Belanja & Wishlist` (Ikon: `shopping_bag`, Warna: `#EC4899`)
     2. `Resep & Kuliner` (Ikon: `restaurant`, Warna: `#F59E0B`)
     3. `Tontonan & Hiburan` (Ikon: `play_circle`, Warna: `#EF4444`)
@@ -72,7 +72,7 @@ Pengguna smartphone di Indonesia mengonsumsi ratusan konten setiap hari dari ber
 #### `FR-AUTH-03`: Penghapusan Akun & Data Permanen (Kepatuhan Google Play)
 * **Deskripsi:** Pengguna dapat menghapus akun dan seluruh datanya secara mandiri.
 * **Kriteria Penerimaan:**
-  * `AC-1`: Tersedia tombol **"Hapus Akun Permanen"** di halaman Pengaturan aplikasi dengan dialog konfirmasi ganda.
+  * `AC-1`: Tersedia tombol **"Hapus Akun Permanen"** di halaman Pengaturan aplikasi dengan dialog konfirmasi ganda; endpoint `DELETE /api/v1/auth/account` wajib menerima body `{"confirmation": "HAPUS"}` — permintaan tanpa konfirmasi tersebut ditolak dengan `422 VALIDATION_ERROR`.
   * `AC-2`: Saat dieksekusi, seluruh data `users`, `collections`, `links`, dan `tags` milik pengguna dihapus permanen (`ON DELETE CASCADE`) dari database.
   * `AC-3`: Tersedia halaman web `https://www.sengganglabs.my.id/tautin/delete-account` bagi pengguna yang sudah mencopot aplikasi namun ingin mengajukan penghapusan data.
 
@@ -146,13 +146,15 @@ Pengguna smartphone di Indonesia mengonsumsi ratusan konten setiap hari dari ber
 * **Deskripsi:** Menampilkan tautan secara visual dan informatif di layar Beranda.
 * **Kriteria Penerimaan:**
   * `AC-1`: Setiap kartu menampilkan: Ikon/Favicon domain asal, nama domain (misal: `tiktok.com`), waktu simpan relatif (*"2 jam lalu"*), gambar *thumbnail* (dengan ikon ▶ di tengah jika `source_type == 'video'` atau ikon 🛒 jika `'ecommerce'`), Judul Bersih (maks 2 baris), Kotak Ringkasan AI berlatar ungu lembut dengan ikon `✨`, label Koleksi, dan deretan `#tags`.
+  * `AC-1a`: Jika link tersimpan tanpa ringkasan AI karena kuota habis (`ai_summary == null`), kotak ringkasan digantikan banner halus: **"✨ Kuota ringkasan AI habis — Upgrade ke Pro"** (menjaga prinsip *Soft-Paywall*, tanpa memblokir penyimpanan).
   * `AC-2`: Pengguna dapat menyematkan (*Pin*) link penting agar selalu berada di urutan paling atas.
 
 #### `FR-FEED-02`: Pencarian Kontekstual & Filter Multi-Dimensi
 * **Deskripsi:** Memudahkan pengguna menemukan link meskipun mereka lupa judul persisnya.
 * **Kriteria Penerimaan:**
   * `AC-1`: Kolom pencarian mencari kecocokan kata di dalam **Judul**, **Ringkasan AI**, **Catatan Pribadi (`user_notes`)**, **Nama Domain**, dan **Tags**. (Contoh: Mengetik *"bawang putih"* akan memunculkan link video TikTok yang ringkasan AI-nya mengandung bahan bawang putih, meskipun judul videonya hanya *"Masak Enak Cek!"*).
-  * `AC-2`: Tersedia barisan *Filter Chips* horizontal untuk memfilter secara instan berdasarkan Koleksi maupun Jenis Konten (`Semua`, `🎬 Video`, `🛒 Belanja`, `📄 Artikel`, `Belum Dibaca`).
+  * `AC-2`: Tersedia barisan *Filter Chips* horizontal untuk memfilter secara instan berdasarkan Koleksi maupun Jenis Konten (`Semua`, `🎬 Video`, `🛒 Belanja`, `📄 Artikel`, `👀 Belum Dibaca`, `📦 Tanpa Koleksi`).
+  * `AC-3`: Chip **"📦 Tanpa Koleksi"** memanggil `GET /api/v1/links?collection_id=unassigned` untuk menampilkan semua link dengan `collection_id = null` (misal hasil penghapusan koleksi dengan aturan `ON DELETE SET NULL`).
 
 #### `FR-FEED-03`: Layar Detail Link & Catatan Pribadi
 * **Deskripsi:** Saat kartu link diklik, pengguna tidak langsung dilempar keluar aplikasi, melainkan melihat halaman ringkasan penuh terlebih dahulu.
@@ -169,8 +171,8 @@ Pengguna smartphone di Indonesia mengonsumsi ratusan konten setiap hari dari ber
 #### `FR-REM-01`: Carousel "Belum Dibaca Minggu Ini" (Resurfacing)
 * **Deskripsi:** Mengangkat kembali tautan yang sudah disimpan namun terlupakan.
 * **Kriteria Penerimaan:**
-  * `AC-1`: Muncul di bagian atas layar Beranda jika pengguna memiliki minimal 3 link dengan status `is_read = false` yang disimpan lebih dari 3 hari yang lalu.
-  * `AC-2`: Menampilkan maksimal 3 kartu geser (*horizontal carousel*) yang diacak setiap hari.
+  * `AC-1`: Endpoint `GET /api/v1/links/resurface` hanya mengembalikan tautan ketika pengguna memiliki **minimal 3 link** dengan status `is_read = false` yang disimpan lebih dari 3 hari yang lalu (`created_at <= now - 3 hari`). Jika jumlah link yang memenuhi syarat **kurang dari 3**, API mengembalikan array kosong `[]` sehingga section ini sepenuhnya disembunyikan di Beranda.
+  * `AC-2`: Ketika syarat minimum terpenuhi, API mengembalikan **3 kartu geser (*horizontal carousel*) yang diacak setiap hari** (`inRandomOrder`, maksimal 3 item).
 
 #### `FR-REM-02`: Pengingat Terjadwal per Link (Custom Reminder — Fitur Pro)
 * **Deskripsi:** Pengguna dapat mengatur alarm notifikasi pada link tertentu.
@@ -188,11 +190,12 @@ Pengguna smartphone di Indonesia mengonsumsi ratusan konten setiap hari dari ber
   * `AC-1`: Secara default, seluruh koleksi bersifat **Privat** (`is_public = false`).
   * `AC-2`: Saat pengguna mengaktifkan *toggle* **"Bagikan ke Publik"**, sistem membuatkan URL unik: `https://www.sengganglabs.my.id/tautin/c/{slug}`.
   * `AC-3`: Demi privasi, halaman publik **tidak pernah** menampilkan alamat email pemilik maupun isi `user_notes` pribadi.
+  * `AC-4`: **Kustomisasi URL Slug (Khusus Pro):** Pengguna Pro/Lifetime dapat mengganti slug publik koleksinya melalui `PATCH /api/v1/collections/{id}` dengan bidang opsional `slug` (`alpha_dash`, 3–100 karakter, unik). Pengguna gratis yang mencoba mengganti slug menerima `PRO_REQUIRED_FOR_CUSTOM_SLUG`.
 
 #### `FR-SHARE-02`: Halaman Web Publik Next.js & Konversi Pengguna Baru
 * **Deskripsi:** Menampilkan koleksi link di browser dengan tampilan modern yang memicu orang lain untuk mengunduh Tautin.
 * **Kriteria Penerimaan:**
-  * `AC-1`: Mendukung *Server-Side Rendering (SSR)* dan *OpenGraph Meta Tags* dinamis sehingga saat link dibagikan di WhatsApp/Telegram/X, muncul *preview* berjudul: **"📂 [Nama Koleksi] ([Jumlah] Tautan) — Dirapikan oleh Tautin AI"**.
+  * `AC-1`: Mendukung *Server-Side Rendering (SSR)* dan *OpenGraph Meta Tags* dinamis sehingga saat link dibagikan di WhatsApp/Telegram/X, muncul *preview* dengan format judul baku: **`📂 {collection.name} ({links_count} Tautan) — Dikurasi oleh {owner_name} di Tautin (Dirapikan oleh AI)`** (contoh: *"📂 Belanja & Wishlist (23 Tautan) — Dikurasi oleh Rani di Tautin (Dirapikan oleh AI)"*).
   * `AC-2`: Di bagian bawah layar web, terdapat *Sticky Banner*: **"Ingin menyimpan dan merangkum link otomatis seperti ini? Download Tautin di Google Play Store"** serta tombol **"Simpan Koleksi Ini ke Akun Tautin Saya"** (menggunakan Android App Links untuk langsung membuka aplikasi Tautin jika sudah terinstal).
 
 ---
@@ -213,28 +216,36 @@ Sistem pembayaran **tidak menggunakan layanan pihak ketiga (tanpa RevenueCat)**.
 
 | Fitur & Batasan Kuota | Pengguna Gratis (`free`) | Pengguna Pro (`pro` / `lifetime`) |
 | :--- | :--- | :--- |
-| **Simpan Link Dasar (URL, Judul & Gambar)** | **Tanpa Batas (*Unlimited*)** | **Tanpa Batas (*Unlimited*)** |
-| **Kuota AI (Ringkasan, Auto-Folder & Auto-Tag)** | **10 Link / Bulan** *(Reset tiap tgl 1)* | **Tanpa Batas** *(Fair Use: 500 link/bln)* |
-| **Batas Pembuatan Koleksi (Folder)** | Maksimal **5 Koleksi** | **Tanpa Batas (*Unlimited*)** |
+| **Simpan Link, Bersihkan Judul, Auto-Folder & Auto-Tag** | **GRATIS & Tanpa Batas (*Unlimited*)** | **GRATIS & Tanpa Batas (*Unlimited*)** |
+| **Kuota Ringkasan AI (`ai_summary`)** | **10 Ringkasan / Bulan** *(Reset tanggal 1 pukul 00:01 WIB)* | **Fair Use: 500 ringkasan/bln** *(Reset tanggal 1 pukul 00:01 WIB)* |
+| **Batas Pembuatan Koleksi (Folder)** | **5 koleksi bawaan + maksimal 3 koleksi kustom** (total 8) | **Tanpa Batas (*Unlimited*)** |
 | **Pencarian Kontekstual (Full-Text Search)** | Tersedia | Tersedia |
 | **Pengingat Kustom per Link (`remind_at`)** | Terkunci (🔒 Khusus Pro) | Tersedia |
-| **Koleksi Publik (`sengganglabs.my.id/tautin/c/...`)** | Maksimal **1 Koleksi Publik** | **Tanpa Batas** + *Custom URL Slug* |
-| **Mode Regenerasi Ringkasan AI Manual** | Tidak Tersedia | Tersedia |
+| **Koleksi Publik (`sengganglabs.my.id/tautin/c/...`)** | Maksimal **1 Koleksi Publik** | **Tanpa Batas** + *Custom URL Slug* (Pro-only, 3–100 karakter) |
+| **Regenerasi Ringkasan AI Manual (`POST /links/{id}/regenerate-ai`)** | Tidak Tersedia (`PRO_REQUIRED_FOR_REGENERATE`) | Tersedia (mengurangi kuota ringkasan AI) |
 
 ### 4.3 Aturan Perilaku Kuota & Soft-Paywall (Penting!)
 1. **Dilarang Memblokir Penyimpanan Link (No Hard-Block on Core Save):**
-   Saat kuota AI pengguna gratis habis (`ai_quota_left == 0`), pengguna **tetap dapat menyimpan link dari aplikasi lain tanpa batas**. Link yang disimpan saat kuota habis tetap diambilkan judul dan gambar *thumbnail*-nya oleh *scraper*, dimasukkan ke koleksi pertama ("Belanja & Wishlist" / "Umum"), dan di bagian kotak Ringkasan AI ditampilkan pesan:
-   > *"✨ Kuota ringkasan AI gratis bulan ini (10/10) sudah habis. **[Upgrade ke Tautin Pro]** untuk merangkum dan mengelompokkan link tanpa batas."*
+   Yang memakan `ai_quota_left` **hanya pembuatan Ringkasan AI (`ai_summary`)**. Menyimpan link, membersihkan judul, memilihkan folder kategori otomatis, dan membuat tags adalah **gratis & tanpa batas** untuk semua pengguna.
+   Saat kuota ringkasan AI pengguna habis (`ai_quota_left == 0`), pengguna **tetap dapat menyimpan link dari aplikasi lain tanpa batas**. Pipeline latar belakang (`ProcessSharedLinkJob`) tetap menjalankan *scraper* untuk mengambil judul & gambar *thumbnail*, lalu:
+   * Memilihkan koleksi dengan **pencocokan kata kunci sederhana** (kata pada judul/domain tautan vs nama koleksi pengguna), dengan *fallback* ke koleksi default pertama.
+   * Mengatur `ai_summary = null`, `is_ai_processed = false`, dan `status = 'completed'`.
+   * Di UI Flutter (`SmartLinkCard` dan *Quick Taut Sheet*), jika `ai_summary == null` maka tampil banner halus:
+   > *"✨ Kuota ringkasan AI habis — Upgrade ke Pro"*
 2. **Titik Pemicu Layar Paywall (Paywall Triggers):**
    Layar penawaran **Tautin Pro** akan muncul secara otomatis ketika pengguna gratis:
-   * Menekan tombol *"Buat Koleksi Baru"* saat sudah memiliki 5 koleksi.
+   * Menekan tombol *"Buat Koleksi Baru"* saat sudah memakai seluruh **3 slot koleksi kustom** (5 koleksi bawaan gratis + maksimal 3 koleksi buatan sendiri).
    * Menekan ikon lonceng *"Pasang Pengingat"* pada detail link.
    * Mencoba mengaktifkan koleksi publik ke-2.
    * Menekan *badge* sisa kuota AI di pojok atas layar Beranda (`✨ Sisa AI: 2/10`).
+   * Menekan tombol *"Buat Ulang Ringkasan AI"* pada detail link (khusus Pro; pengguna gratis melihat `PRO_REQUIRED_FOR_REGENERATE`).
 3. **Verifikasi & Keamanan Pembelian (Anti-Mod APK / Replay Attack):**
    * Setiap pembelian di Flutter wajib mengirimkan `product_id` dan `purchase_token` ke endpoint Laravel `POST /api/v1/billing/verify-purchase`.
    * Backend Laravel memvalidasi token tersebut langsung ke server Google Play, melakukan *acknowledgement*, dan menyimpan `SHA-256(purchase_token)` agar satu struk pembelian tidak bisa diklaim oleh akun lain.
    * Tersedia tombol **"Pulihkan Pembelian (Restore Purchase)"** di layar Paywall dan Pengaturan untuk memulihkan status Pro saat pengguna berganti HP.
+4. **Refund & Pencabutan (Voided Purchases + Real-Time Developer Notifications):**
+   * Komando jadwal `tautin:sync-subscriptions` (per jam) mengunduh **Voided Purchases** dari Google Play Developer API. Purchase_token yang terbukti di-refund diubah `subscriptions.status = 'refunded'`, pengguna diturunkan ke `plan_type = 'free'`, dan `ai_quota_left` dipangkas menjadi `min(kuota saat ini, 10)` — tanpa pernah menaikkan kuota. Mekanisme ini mencakup **purchase `tautin_pro_lifetime`** yang tidak terjaring pemeriksaan tanggal kedaluwarsa (`plan_expires_at = null`).
+   * Endpoint `POST /api/v1/webhooks/google-play-rtdn` (dilindungi *secret* `GOOGLE_PLAY_RTDN_SECRET` via query `?secret=` atau header `X-RTDN-Secret`) menerima push Pub/Sub: tipe `subscriptionNotification` 1 (RECOVERED) / 2 (RENEWED) memverifikasi ulang & mengembalikan status Pro, sedangkan tipe 3 (CANCELED) / 12 (REVOKED) / 13 (EXPIRED) maupun `voidedPurchaseNotification` langsung mencabut langganan terkait, idempoten untuk baris yang sudah `refunded`.
 
 ---
 
@@ -255,6 +266,7 @@ Sistem pembayaran **tidak menggunakan layanan pihak ketiga (tanpa RevenueCat)**.
 1. **Onboarding & Login Screen:**
    * Ilustrasi cara kerja Tautin (3 slide singkat) + Tombol **"Lanjutkan dengan Google"** + Tautan kecil ke Kebijakan Privasi & Syarat Ketentuan.
 2. **Quick Taut Bottom Sheet (Overlay):**
+   * Tinggi sheet baku = **32% tinggi layar** (`maxHeight * 0.32`), durasi *auto-close* = **2 detik (`2000ms`)** dengan indikator progres linear.
    * Header: Logo Tautin + Status *"✨ Menyimpan tautan..."* + Indikator sisa kuota AI.
    * Body: Preview URL yang sedang disimpan + Pilihan *Horizontal Chips* untuk mengganti Koleksi secara manual jika diinginkan + Tombol *"Selesai"*.
 3. **Home Screen (Layar Utama):**
@@ -284,6 +296,7 @@ Sistem pembayaran **tidak menggunakan layanan pihak ketiga (tanpa RevenueCat)**.
 ### 6.2 Penanganan Kasus Khusus (Edge Cases)
 1. **Tautan Duplikat (Duplicate URL):**
    * Jika pengguna menyimpan URL yang sama persis dengan yang sudah ada di akunnya, sistem **tidak memotong kuota AI** dan tidak membuat duplikat baru.
+   * Deteksi duplikat bekerja **instan (< 1ms)** melalui dua hash SHA-256: `url_hash` (URL kanonik hasil *unshorten*) **dan** `raw_url_hash` (URL persis seperti pertama kali di-*share*, biasanya shortlink seperti `vt.tiktok.com/xyz`). Karena `ProcessSharedLinkJob` menulis ulang `url` + `url_hash` ke URL kanonik namun **tidak pernah mengubah `raw_url_hash`**, men-share shortlink yang sama untuk kedua kalinya — bahkan setelah link asli selesai di-*unshorten* — langsung terdeteksi sebagai duplikat (`meta.is_duplicate = true`, HTTP 200).
    * Sistem memperbarui waktu `updated_at` link lama agar naik ke urutan paling atas beranda, dan menampilkan info di *Bottom Sheet*: *"Tautan ini sudah ada di koleksimu, dinaikkan ke paling atas!"*
 2. **Konten Privat / Butuh Login (Instagram Private, Grup FB Tertutup, Shopee Captcha):**
    * Ketika *scraper* terhalang halaman login, sistem tidak boleh menandai link sebagai gagal (`failed`).

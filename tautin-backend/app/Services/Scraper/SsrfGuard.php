@@ -235,6 +235,60 @@ class SsrfGuard
     }
 
     /**
+     * Normalize a URL for offline/instant duplicate hashing.
+     *
+     * Performs only string-level cleanups (no DNS, no HTTP, single-digit
+     * milliseconds):
+     * 1. Whitespace is trimmed and interior whitespace is dropped (share
+     *    intents frequently wrap URLs in spaces/newlines).
+     * 2. The host is lower-cased (hosts are case-insensitive).
+     * 3. Tracking query parameters (`utm_*`, `fbclid`, `igshid`, `gclid`,
+     *    `_t`, `_r`, case-insensitive match) are stripped and the `#fragment`
+     *    (tracking-tail territory of TikTok/Shopee share links) is removed.
+     *
+     * @throws UnsafeUrlException when the URL has no valid scheme/host
+     */
+    public static function normalizeUrlWithoutNetwork(string $url): string
+    {
+        $cleaned = preg_replace('/\s+/u', '', trim($url)) ?? $url;
+
+        $parts = parse_url($cleaned);
+
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            throw new UnsafeUrlException('Format URL tidak valid untuk normalisasi.');
+        }
+
+        $normalized = strtolower((string) $parts['scheme']).'://'.strtolower((string) $parts['host']);
+
+        $port = $parts['port'] ?? null;
+        if ($port !== null && ! in_array((int) $port, [80, 443], true)) {
+            $normalized .= ':'.$port;
+        }
+
+        $path = $parts['path'] ?? '/';
+        $normalized .= $path;
+
+        $query = $parts['query'] ?? null;
+        if ($query !== null && $query !== '') {
+            // Split manually to preserve the original parameter encoding.
+            $kept = [];
+            foreach (explode('&', $query) as $pair) {
+                $name = strtolower(urldecode((string) (explode('=', $pair, 2)[0] ?? '')));
+                $isTracking = str_starts_with($name, 'utm_') || in_array($name, self::TRACKING_PARAMS, true);
+                if (! $isTracking && $name !== '') {
+                    $kept[] = $pair;
+                }
+            }
+
+            if (! empty($kept)) {
+                $normalized .= '?'.implode('&', $kept);
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
      * Resolve a relative or absolute redirect location against the current URL.
      */
     protected function resolveRedirectUrl(string $currentUrl, string $location): string

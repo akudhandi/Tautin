@@ -20,6 +20,13 @@ class GooglePlayBillingService
     protected static $mockVerifier = null;
 
     /**
+     * Testing hook to mock voided purchases list without reaching Google APIs.
+     *
+     * @var (callable(string): list<string>)|null
+     */
+    protected static $mockVoidedPurchases = null;
+
+    /**
      * Set a custom verifier callback for testing.
      *
      * @param  (callable(string, string, string): array<string, mixed>)|null  $verifier
@@ -30,11 +37,63 @@ class GooglePlayBillingService
     }
 
     /**
+     * Set a custom voided-purchases callback for testing (list of purchase tokens).
+     *
+     * @param  (callable(string): list<string>)|null  $callback
+     */
+    public static function setMockVoidedPurchases(?callable $callback): void
+    {
+        static::$mockVoidedPurchases = $callback;
+    }
+
+    /**
      * Get the configured package name.
      */
     public function getPackageName(): string
     {
         return (string) config('tautin.google_play.package_name', 'id.my.sengganglabs.tautin');
+    }
+
+    /**
+     * Fetch refunded/voided purchase tokens directly from Google Play.
+     *
+     * Covers purchases of any kind (products AND subscriptions) so lifetime
+     * buys — which never show up in the `plan_expires_at` expiry sweep — can
+     * still be revoked after a refund.
+     *
+     * @return list<string> original purchase tokens
+     */
+    public function getVoidedPurchaseTokens(): array
+    {
+        if (static::$mockVoidedPurchases !== null) {
+            return (static::$mockVoidedPurchases)($this->getPackageName());
+        }
+
+        $packageName = $this->getPackageName();
+        $publisher = $this->getAndroidPublisher();
+
+        try {
+            $response = $publisher->purchases_voidedpurchases->listVoidedpurchases($packageName);
+
+            $tokens = [];
+            $voidedPurchases = $response->getVoidedPurchases() ?? [];
+
+            foreach ($voidedPurchases as $voidedPurchase) {
+                $token = method_exists($voidedPurchase, 'getPurchaseToken')
+                    ? $voidedPurchase->getPurchaseToken()
+                    : null;
+
+                if (is_string($token) && $token !== '') {
+                    $tokens[] = $token;
+                }
+            }
+
+            return $tokens;
+        } catch (\Throwable $e) {
+            Log::error('Google Play Voided Purchases fetch failed', ['error' => $e->getMessage()]);
+
+            return [];
+        }
     }
 
     /**

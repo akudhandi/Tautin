@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\GooglePlayBillingService;
 use Carbon\Carbon;
@@ -111,8 +112,77 @@ class SyncExpiredSubscriptionsCommand extends Command
             }
         }
 
-        $this->info("Sinkronisasi langganan selesai: {$renewed} diperpanjang, {$downgraded} diturunkan ke paket gratis.");
+        $refunded = $this->revokeVoidedPurchases($billingService, $freeQuota);
+
+        $this->info("Sinkronisasi langganan selesai: {$renewed} diperpanjang, {$downgraded} diturunkan ke paket gratis, {$refunded} dicabut karena refund Google Play.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Pull Google Play Voided Purchases and revoke matching subscriptions.
+     *
+     * Handles refunded PRO subscriptions AND refunded LIFETIME purchases —
+     * lifetime users have `plan_expires_at = NULL`, so the date-based expiry
+     * sweep alone can never catch them.
+     *
+     * @return int number of subscriptions resolved as refunded
+     */
+    protected function revokeVoidedPurchases(GooglePlayBillingService $billingService, int $freeQuota): int
+    {
+        try {
+            $voidedTokens = $billingService->getVoidedPurchaseTokens();
+        } catch (\Throwable $e) {
+            Log::warning('Voided purchases fetch failed, skipping refund sweep', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+
+        if ($voidedTokens === []) {
+            return 0;
+        }
+
+        $refunded = 0;
+
+        $subscriptions = Subscription::whereIn('purchase_token', $voidedTokens)
+            ->with('user')
+            ->get();
+
+        foreach ($subscriptions as $subscription) {
+            // Idempotent: skip rows already processed.
+            if ($subscription->status === 'refunded') {
+                continue;
+            }
+
+            $subscription->update([
+                'status' => 'refunded',
+                'last_verified_at' => Carbon::now(),
+            ]);
+
+            /** @var User|null $user */
+            $user = $subscription->user;
+
+            if ($user && $user->plan_type !== 'free') {
+                $user->update([
+                    // Never top the account up above its current quota when
+                    // revoking: `min(current, free quota)`.
+                    'plan_type' => 'free',
+                    'plan_expires_at' => null,
+                    'ai_quota_left' => min((int) $user->ai_quota_left, $freeQuota),
+                ]);
+            }
+
+            $refunded++;
+
+            Log::info('Subscription revoked due to Google Play voided purchase', [
+                'subscription_id' => $subscription->id,
+                'user_id' => $subscription->user_id,
+                'product_id' => $subscription->product_id,
+            ]);
+        }
+
+        return $refunded;
     }
 }

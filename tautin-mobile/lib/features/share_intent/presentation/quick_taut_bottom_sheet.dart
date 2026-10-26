@@ -175,7 +175,8 @@ class _QuickTautBottomSheetState extends ConsumerState<QuickTautBottomSheet> {
 
     final Map<String, dynamic> payload = <String, dynamic>{
       'url': parsed.cleanUrl,
-      if (parsed.rawDescription != null) 'raw_description': parsed.rawDescription,
+      if (parsed.rawDescription != null)
+        'raw_description': parsed.rawDescription,
       'collection_id': _selectedCollectionId,
       'user_notes': null,
     };
@@ -201,12 +202,11 @@ class _QuickTautBottomSheetState extends ConsumerState<QuickTautBottomSheet> {
 
       setState(() {
         _savedLink = outcome.link;
-        _message =
-            outcome.isDuplicate
-                ? 'Tautan sudah ada di Tautin, dinaikkan ke paling atas!'
-                : (outcome.message.isEmpty
-                    ? 'Tautan berhasil disimpan.'
-                    : outcome.message);
+        _message = outcome.isDuplicate
+            ? 'Tautan sudah ada di Tautin, dinaikkan ke paling atas!'
+            : (outcome.message.isEmpty
+                  ? 'Tautan berhasil disimpan.'
+                  : outcome.message);
         _status = QuickTautStatus.saved;
       });
 
@@ -227,7 +227,8 @@ class _QuickTautBottomSheetState extends ConsumerState<QuickTautBottomSheet> {
         await _storage.enqueueOfflineLink(payload: payload);
         setState(() {
           _status = QuickTautStatus.savedOffline;
-          _message = 'Tersimpan di perangkat. Akan dirapikan AI saat '
+          _message =
+              'Tersimpan di perangkat. Akan dirapikan AI saat '
               'terhubung ke internet.';
         });
         return;
@@ -273,7 +274,10 @@ class _QuickTautBottomSheetState extends ConsumerState<QuickTautBottomSheet> {
     if (link == null || link.collectionId == collection?.id) {
       return;
     }
-    await _applyPendingCollection(patchId: link.id, collectionId: collection!.id);
+    await _applyPendingCollection(
+      patchId: link.id,
+      collectionId: collection!.id,
+    );
   }
 
   Future<void> _onSaveNotes() async {
@@ -320,13 +324,12 @@ class _QuickTautBottomSheetState extends ConsumerState<QuickTautBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final List<CollectionModel> collections =
-        _storage.loadCollections();
+    final List<CollectionModel> collections = _storage.loadCollections();
 
     return Container(
       width: double.infinity,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.42,
+        maxHeight: MediaQuery.of(context).size.height * 0.32,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -343,128 +346,165 @@ class _QuickTautBottomSheetState extends ConsumerState<QuickTautBottomSheet> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _HeaderRow(
-                status: _status,
-                message: _message,
-                aiQuotaLeft: _aiQuotaLeft,
-                isPro: _isPro,
-              ),
-              const SizedBox(height: 12),
-              if (_countdownActive) ...<Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: _countdownProgress,
-                    minHeight: 5,
-                    backgroundColor:
-                        theme.textTheme.bodySmall?.color?.withValues(alpha: 0.18),
+          // The 32%-height budget can get tight on small screens (quota banner
+          // + note editor), so the body scrolls instead of overflowing.
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.textTheme.bodySmall?.color?.withValues(
+                        alpha: 0.3,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
-              ],
-              if (_parsed != null)
-                _UrlPreview(
-                  url: _parsed!.cleanUrl,
-                  domain:
-                      Uri.tryParse(_parsed!.cleanUrl)?.host ?? _parsed!.cleanUrl,
+                _HeaderRow(
+                  status: _status,
+                  message: _message,
+                  aiQuotaLeft: _aiQuotaLeft,
+                  isPro: _isPro,
                 ),
-              const SizedBox(height: 14),
-              SizedBox(
-                height: 42,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: <Widget>[
-                    _CollectionChip(
-                      label: AppConfig.aiAutoCollectionChip,
-                      selected: _selectedCollectionId == null,
-                      onTap: () => _onCollectionChipTap(null),
+                const SizedBox(height: 12),
+                if (_countdownActive) ...<Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: _countdownProgress,
+                      minHeight: 5,
+                      backgroundColor: theme.textTheme.bodySmall?.color
+                          ?.withValues(alpha: 0.18),
                     ),
-                    for (final CollectionModel collection in collections)
-                      _CollectionChip(
-                        label: collection.name,
-                        selected:
-                            _selectedCollectionId == collection.id,
-                        onTap: () => _onCollectionChipTap(collection),
-                      ),
-                  ],
-                ),
-              ),
-              if (_noteEditorOpen)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: TextField(
-                          controller: _noteController,
-                          autofocus: true,
-                          maxLines: 2,
-                          minLines: 1,
-                          decoration: const InputDecoration(
-                            hintText: 'Tulis catatan pribadi...',
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (_parsed != null)
+                  _UrlPreview(
+                    url: _parsed!.cleanUrl,
+                    domain:
+                        Uri.tryParse(_parsed!.cleanUrl)?.host ??
+                        _parsed!.cleanUrl,
+                  ),
+                if (_status == QuickTautStatus.saved &&
+                    _savedLink?.aiSummary == null) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: TautinColors.aiViolet.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            AppConfig.aiQuotaExhaustedBanner,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: TautinColors.primaryIndigo,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'Simpan catatan',
-                        onPressed: _onSaveNotes,
-                        style: IconButton.styleFrom(
-                          backgroundColor: TautinColors.primaryIndigo,
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: const Icon(Icons.check_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 14),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed:
-                          _status == QuickTautStatus.saved
-                              ? () {
-                                  _cancelAutoClose();
-                                  setState(() {
-                                    _noteEditorOpen = true;
-                                  });
-                                }
-                              : null,
-                      icon: const Icon(Icons.sticky_note_2_outlined, size: 18),
-                      label: const Text('Tambah Catatan'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () =>
-                          widget.fromExternalIntent
-                              ? SystemNavigator.pop()
-                              : Navigator.of(context).pop(),
-                      icon: const Icon(Icons.done_rounded, size: 18),
-                      label: const Text('Selesai'),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 42,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: <Widget>[
+                      _CollectionChip(
+                        label: AppConfig.aiAutoCollectionChip,
+                        selected: _selectedCollectionId == null,
+                        onTap: () => _onCollectionChipTap(null),
+                      ),
+                      for (final CollectionModel collection in collections)
+                        _CollectionChip(
+                          label: collection.name,
+                          selected: _selectedCollectionId == collection.id,
+                          onTap: () => _onCollectionChipTap(collection),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_noteEditorOpen)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: TextField(
+                            controller: _noteController,
+                            autofocus: true,
+                            maxLines: 2,
+                            minLines: 1,
+                            decoration: const InputDecoration(
+                              hintText: 'Tulis catatan pribadi...',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'Simpan catatan',
+                          onPressed: _onSaveNotes,
+                          style: IconButton.styleFrom(
+                            backgroundColor: TautinColors.primaryIndigo,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.check_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _status == QuickTautStatus.saved
+                            ? () {
+                                _cancelAutoClose();
+                                setState(() {
+                                  _noteEditorOpen = true;
+                                });
+                              }
+                            : null,
+                        icon: const Icon(
+                          Icons.sticky_note_2_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Tambah Catatan'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => widget.fromExternalIntent
+                            ? SystemNavigator.pop()
+                            : Navigator.of(context).pop(),
+                        icon: const Icon(Icons.done_rounded, size: 18),
+                        label: const Text('Selesai'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -513,7 +553,10 @@ class _HeaderRow extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: <Color>[TautinColors.primaryIndigo, TautinColors.aiViolet],
+              colors: <Color>[
+                TautinColors.primaryIndigo,
+                TautinColors.aiViolet,
+              ],
             ),
           ),
           alignment: Alignment.center,
@@ -578,7 +621,11 @@ class _UrlPreview extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.link_rounded, size: 18, color: TautinColors.primaryIndigo),
+          const Icon(
+            Icons.link_rounded,
+            size: 18,
+            color: TautinColors.primaryIndigo,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -636,7 +683,7 @@ class _CollectionChip extends StatelessWidget {
               color: selected
                   ? TautinColors.primaryIndigo
                   : theme.textTheme.bodySmall?.color?.withValues(alpha: 0.3) ??
-                      Colors.grey,
+                        Colors.grey,
             ),
             borderRadius: BorderRadius.circular(18),
           ),

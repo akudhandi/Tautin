@@ -168,7 +168,7 @@ class LinkFeedAndSearchTest extends TestCase
             ->assertJsonPath('data.data.0.id', $targetLink->id);
     }
 
-    public function test_resurface_returns_up_to_three_unread_links_older_than_three_days(): void
+    public function test_resurface_returns_empty_array_when_fewer_than_three_eligible(): void
     {
         $user = User::create([
             'name' => 'Eka',
@@ -226,8 +226,110 @@ class LinkFeedAndSearchTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/links/resurface');
 
+        // PRD FR-REM-01 AC-1: the resurfacing carousel requires a minimum of
+        // 3 eligible links; with only 2 the backend returns an empty list.
         $response->assertStatus(200)
-            ->assertJsonCount(2, 'data');
+            ->assertExactJson([
+                'success' => true,
+                'message' => 'Daftar tautan untuk dibaca ulang berhasil dimuat.',
+                'data' => [],
+            ]);
+    }
+
+    public function test_resurface_returns_three_random_links_when_enough_eligible(): void
+    {
+        $user = User::create([
+            'name' => 'Wina',
+            'email' => 'wina@example.com',
+        ]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $eligibleIds = [];
+        $expiredDays = [7, 6, 5];
+
+        foreach ($expiredDays as $index => $days) {
+            $link = Link::create([
+                'user_id' => $user->id,
+                'url' => 'https://example.com/old-resurface-'.$index,
+                'url_hash' => hash('sha256', 'https://example.com/old-resurface-'.$index),
+                'domain' => 'example.com',
+                'title' => 'Tautan Lama Belum Dibaca '.$index,
+                'is_read' => false,
+            ]);
+            $link->created_at = Carbon::now()->subDays($days);
+            $link->saveQuietly();
+            $eligibleIds[] = $link->id;
+        }
+
+        // Fresh or already-read links must never come back.
+        Link::create([
+            'user_id' => $user->id,
+            'url' => 'https://example.com/fresh-resurface',
+            'url_hash' => hash('sha256', 'https://example.com/fresh-resurface'),
+            'domain' => 'example.com',
+            'title' => 'Tautan Baru',
+            'is_read' => false,
+        ]);
+        Link::create([
+            'user_id' => $user->id,
+            'url' => 'https://example.com/read-resurface',
+            'url_hash' => hash('sha256', 'https://example.com/read-resurface'),
+            'domain' => 'example.com',
+            'title' => 'Tautan Sudah Dibaca',
+            'is_read' => true,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/links/resurface');
+
+        $returnedIds = collect($response->assertStatus(200)->json('data'))
+            ->pluck('id')
+            ->values()
+            ->all();
+        sort($returnedIds);
+        sort($eligibleIds);
+
+        $this->assertEquals($eligibleIds, $returnedIds);
+    }
+
+    public function test_feed_supports_collection_id_unassigned_filter(): void
+    {
+        $user = User::create([
+            'name' => 'Yuna',
+            'email' => 'yuna@example.com',
+        ]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $collection = Collection::create([
+            'user_id' => $user->id,
+            'name' => 'Koleksi Terisi',
+            'slug' => 'koleksi-terisi',
+        ]);
+
+        $assigned = Link::create([
+            'user_id' => $user->id,
+            'collection_id' => $collection->id,
+            'url' => 'https://example.com/assigned',
+            'url_hash' => hash('sha256', 'https://example.com/assigned'),
+            'domain' => 'example.com',
+            'title' => 'Link Dalam Koleksi',
+        ]);
+
+        $orphan = Link::create([
+            'user_id' => $user->id,
+            'url' => 'https://example.com/orphan',
+            'url_hash' => hash('sha256', 'https://example.com/orphan'),
+            'domain' => 'example.com',
+            'title' => 'Link Tanpa Koleksi',
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/links?collection_id=unassigned');
+
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.id', $orphan->id)
+            ->assertJsonMissing(['id' => $assigned->id]);
     }
 
     public function test_free_user_cannot_set_custom_reminder_returns_403_pro_required(): void

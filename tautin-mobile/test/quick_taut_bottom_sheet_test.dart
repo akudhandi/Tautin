@@ -39,7 +39,8 @@ class _PatchRecord {
 /// Scriptable [LinkRepository] — no Dio, no network.
 class _FakeLinkRepository implements LinkRepository {
   _FakeLinkRepository({
-    this.quickSaveHandlers = const <QuickSaveOutcome Function(_QuickSaveRecord)>[],
+    this.quickSaveHandlers =
+        const <QuickSaveOutcome Function(_QuickSaveRecord)>[],
     this.updateLinkHandler,
   });
 
@@ -66,9 +67,11 @@ class _FakeLinkRepository implements LinkRepository {
 
     final QuickSaveOutcome Function(_QuickSaveRecord)? handler =
         quickSaveHandlers.isEmpty
-            ? null
-            : quickSaveHandlers[(quickSaveCalls.length - 1)
-                .clamp(0, quickSaveHandlers.length - 1)];
+        ? null
+        : quickSaveHandlers[(quickSaveCalls.length - 1).clamp(
+            0,
+            quickSaveHandlers.length - 1,
+          )];
     if (handler == null) {
       throw UnimplementedError('quickSave handler is not scripted');
     }
@@ -145,9 +148,10 @@ Future<void> _pumpSheet(
   required String sharedText,
   required _FakeLinkRepository repo,
 }) async {
-  // Wide 640x900 logical surface so sheet rows and all collection chips
-  // fit without scrolling and nothing overflows in tests.
-  tester.view.physicalSize = const Size(640 * 3, 900 * 3);
+  // 640x1200 logical surface: the sheet is capped at 32% of screen height
+  // (=384dp) so the header, URL preview, quota banner, chips, and action
+  // buttons all fit without scrolling and nothing overflows in tests.
+  tester.view.physicalSize = const Size(640 * 3, 1200 * 3);
   tester.view.devicePixelRatio = 3.0;
   addTearDown(tester.view.reset);
 
@@ -240,12 +244,12 @@ void main() {
     final _FakeLinkRepository repo = _FakeLinkRepository(
       quickSaveHandlers: <QuickSaveOutcome Function(_QuickSaveRecord)>[
         (_) => const QuickSaveOutcome(
-              link: _kSavedShopeeLink,
-              isDuplicate: false,
-              message: 'Tautan berhasil disimpan.',
-              aiQuotaLeft: 2,
-              planType: 'free',
-            ),
+          link: _kSavedShopeeLink,
+          isDuplicate: false,
+          message: 'Tautan berhasil disimpan.',
+          aiQuotaLeft: 2,
+          planType: 'free',
+        ),
       ],
     );
 
@@ -253,10 +257,7 @@ void main() {
 
     // The quick-save fired immediately with the parsed URL + raw description.
     expect(repo.quickSaveCalls, hasLength(1));
-    expect(
-      repo.quickSaveCalls.single.url,
-      'https://s.shopee.co.id/3Vja8nQXm',
-    );
+    expect(repo.quickSaveCalls.single.url, 'https://s.shopee.co.id/3Vja8nQXm');
     expect(repo.quickSaveCalls.single.rawDescription, _kShopeeRawDescription);
     expect(repo.quickSaveCalls.single.collectionId, isNull);
     expect(find.text('Tautan berhasil disimpan.'), findsOneWidget);
@@ -271,10 +272,7 @@ void main() {
 
     // URL preview: domain + clean url.
     expect(find.text('s.shopee.co.id'), findsOneWidget);
-    expect(
-      find.text('https://s.shopee.co.id/3Vja8nQXm'),
-      findsOneWidget,
-    );
+    expect(find.text('https://s.shopee.co.id/3Vja8nQXm'), findsOneWidget);
 
     // Countdown bar is running in the saved state.
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
@@ -291,11 +289,11 @@ void main() {
     final _FakeLinkRepository repo = _FakeLinkRepository(
       quickSaveHandlers: <QuickSaveOutcome Function(_QuickSaveRecord)>[
         (_) => const QuickSaveOutcome(
-              link: _kSavedShopeeLink,
-              isDuplicate: true,
-              message: '',
-              aiQuotaLeft: 8,
-            ),
+          link: _kSavedShopeeLink,
+          isDuplicate: true,
+          message: '',
+          aiQuotaLeft: 8,
+        ),
       ],
     );
 
@@ -347,58 +345,113 @@ void main() {
     expect(find.byType(QuickTautBottomSheet), findsNothing);
   });
 
-  testWidgets('texts without a URL show the Indonesian warning and skip the API', (
-    WidgetTester tester,
-  ) async {
-    final _FakeLinkRepository repo = _FakeLinkRepository();
+  testWidgets(
+    'texts without a URL show the Indonesian warning and skip the API',
+    (WidgetTester tester) async {
+      final _FakeLinkRepository repo = _FakeLinkRepository();
 
-    await _pumpSheet(
-      tester,
-      sharedText: 'TEMUKAN KEBAHAGIAAN DI SINI, diskon gede2an!!!',
-      repo: repo,
-    );
+      await _pumpSheet(
+        tester,
+        sharedText: 'TEMUKAN KEBAHAGIAAN DI SINI, diskon gede2an!!!',
+        repo: repo,
+      );
 
-    expect(
-      find.text('Tidak ada tautan yang terdeteksi pada teks dibagikan.'),
-      findsOneWidget,
-    );
-    expect(repo.quickSaveCalls, isEmpty);
-    expect(repo.patchCalls, isEmpty);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(_storage.pendingOfflineCount, 0);
-  });
+      expect(
+        find.text('Tidak ada tautan yang terdeteksi pada teks dibagikan.'),
+        findsOneWidget,
+      );
+      expect(repo.quickSaveCalls, isEmpty);
+      expect(repo.patchCalls, isEmpty);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(_storage.pendingOfflineCount, 0);
+    },
+  );
 
-  testWidgets('tapping a collection chip cancels auto-close and PATCHes the link', (
+  testWidgets(
+    'saved link without an AI summary shows the quota upsell banner',
+    (WidgetTester tester) async {
+      final _FakeLinkRepository repo = _FakeLinkRepository(
+        quickSaveHandlers: <QuickSaveOutcome Function(_QuickSaveRecord)>[
+          (_) => const QuickSaveOutcome(
+            link: _kSavedShopeeLink,
+            isDuplicate: false,
+            message: 'Tautan berhasil disimpan.',
+            aiQuotaLeft: 0,
+            planType: 'free',
+          ),
+        ],
+      );
+
+      await _pumpSheet(tester, sharedText: _kShopeeShareText, repo: repo);
+
+      expect(find.text(AppConfig.aiQuotaExhaustedBanner), findsOneWidget);
+
+      await _drainCountdown(tester);
+    },
+  );
+
+  testWidgets('saved link with an AI summary hides the quota upsell banner', (
     WidgetTester tester,
   ) async {
     final _FakeLinkRepository repo = _FakeLinkRepository(
       quickSaveHandlers: <QuickSaveOutcome Function(_QuickSaveRecord)>[
         (_) => const QuickSaveOutcome(
-              link: _kSavedShopeeLink,
-              isDuplicate: false,
-              message: 'Tautan berhasil disimpan.',
-            ),
+          link: LinkModel(
+            id: 501,
+            userId: 7,
+            url: 'https://s.shopee.co.id/3Vja8nQXm',
+            urlHash: 'hash-abc',
+            domain: 's.shopee.co.id',
+            title: 'Flash Sale Sepatu Lari',
+            aiSummary: 'Sepatu lari ringan dengan harga diskon Rp349.000.',
+          ),
+          isDuplicate: false,
+          message: 'Tautan berhasil disimpan.',
+          aiQuotaLeft: 2,
+          planType: 'free',
+        ),
       ],
-      updateLinkHandler: (_PatchRecord call) => _kPatchedShopeeLink,
     );
 
     await _pumpSheet(tester, sharedText: _kShopeeShareText, repo: repo);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
 
-    await tester.tap(find.text('Belanja & Wishlist'));
-    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text(AppConfig.aiQuotaExhaustedBanner), findsNothing);
 
-    // Auto-close canceled -> progress bar removed...
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    // ...and the pending chip choice PATCHed right away.
-    expect(repo.patchCalls, hasLength(1));
-    expect(repo.patchCalls.single.id, 501);
-    expect(repo.patchCalls.single.collectionId, 7);
-
-    // Long wait: the sheet stays open because the timer was canceled.
-    await tester.pump(const Duration(seconds: 3));
-    expect(find.byType(QuickTautBottomSheet), findsOneWidget);
+    await _drainCountdown(tester);
   });
+
+  testWidgets(
+    'tapping a collection chip cancels auto-close and PATCHes the link',
+    (WidgetTester tester) async {
+      final _FakeLinkRepository repo = _FakeLinkRepository(
+        quickSaveHandlers: <QuickSaveOutcome Function(_QuickSaveRecord)>[
+          (_) => const QuickSaveOutcome(
+            link: _kSavedShopeeLink,
+            isDuplicate: false,
+            message: 'Tautan berhasil disimpan.',
+          ),
+        ],
+        updateLinkHandler: (_PatchRecord call) => _kPatchedShopeeLink,
+      );
+
+      await _pumpSheet(tester, sharedText: _kShopeeShareText, repo: repo);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      await tester.tap(find.text('Belanja & Wishlist'));
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Auto-close canceled -> progress bar removed...
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // ...and the pending chip choice PATCHed right away.
+      expect(repo.patchCalls, hasLength(1));
+      expect(repo.patchCalls.single.id, 501);
+      expect(repo.patchCalls.single.collectionId, 7);
+
+      // Long wait: the sheet stays open because the timer was canceled.
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.byType(QuickTautBottomSheet), findsOneWidget);
+    },
+  );
 
   testWidgets('"Tambah Catatan" PATCHes user_notes and keeps the sheet open', (
     WidgetTester tester,
@@ -406,10 +459,10 @@ void main() {
     final _FakeLinkRepository repo = _FakeLinkRepository(
       quickSaveHandlers: <QuickSaveOutcome Function(_QuickSaveRecord)>[
         (_) => const QuickSaveOutcome(
-              link: _kSavedShopeeLink,
-              isDuplicate: false,
-              message: 'Tautan berhasil disimpan.',
-            ),
+          link: _kSavedShopeeLink,
+          isDuplicate: false,
+          message: 'Tautan berhasil disimpan.',
+        ),
       ],
       updateLinkHandler: (_PatchRecord call) => _kPatchedShopeeLink,
     );
@@ -429,7 +482,10 @@ void main() {
 
     expect(repo.patchCalls, hasLength(1));
     expect(repo.patchCalls.single.id, 501);
-    expect(repo.patchCalls.single.userNotes, 'Simpan buat wishlist baju lebaran');
+    expect(
+      repo.patchCalls.single.userNotes,
+      'Simpan buat wishlist baju lebaran',
+    );
     expect(find.text('Catatan tersimpan.'), findsOneWidget);
 
     // Note interaction canceled the countdown as well.
