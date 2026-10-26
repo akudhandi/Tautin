@@ -209,36 +209,36 @@
 **Tujuan Fase 4:** Membangun aplikasi Android Flutter dengan identitas `id.my.sengganglabs.tautin`, menerapkan desain visual Tautin, menyimpan cache koleksi di Hive, serta mengaktifkan fitur penyimpanan instan (< 2 detik) dari menu *Share* aplikasi lain.
 
 ### 4.1 Inisialisasi Flutter, Konfigurasi Android & Design System
-- [ ] **Inisialisasi Proyek & Dependensi (`pubspec.yaml`):**
+- [x] **Inisialisasi Proyek & Dependensi (`pubspec.yaml`):**
   - Buat proyek Flutter di `tautin-mobile/` dengan org/package `id.my.sengganglabs.tautin`.
-  - Tambahkan paket: `flutter_riverpod`, `dio`, `go_router`, `hive_ce`, `hive_ce_flutter`, `receive_sharing_intent`, `google_sign_in`, `in_app_purchase`, `firebase_core`, `firebase_messaging`, `google_fonts`, `cached_network_image`, `url_launcher`, `share_plus`, `shimmer`.
-- [ ] **Konfigurasi `android/app/src/main/AndroidManifest.xml`:**
+  - Tambahkan paket: `flutter_riverpod`, `dio`, `go_router`, `hive_ce`, `hive_ce_flutter`, `receive_sharing_intent`, `google_sign_in`, `in_app_purchase`, `google_fonts`, `cached_network_image`, `url_launcher`, `share_plus`, `shimmer`, `intl` (tanpa Firebase — notifikasi FCM direncanakan di fase selanjutnya).
+- [x] **Konfigurasi `android/app/src/main/AndroidManifest.xml`:**
   - Pasang permission `INTERNET`, `com.android.vending.BILLING`, dan `POST_NOTIFICATIONS`.
   - Set `android:launchMode="singleTask"` pada `.MainActivity`.
   - Tambahkan `<intent-filter>` untuk `android.intent.action.SEND` (`mimeType="text/plain"`).
   - Tambahkan `<intent-filter android:autoVerify="true">` untuk *App Links* domain `www.sengganglabs.my.id` dengan `pathPrefix="/tautin/c/"`.
-- [ ] **Buat Design System (`lib/core/theme/tautin_theme.dart`):**
+- [x] **Buat Design System (`lib/core/theme/tautin_theme.dart`):**
   - Terapkan palet warna sesuai `PRD.md`: Primary Electric Indigo (`#4F46E5`), AI Accent Soft Violet (`#8B5CF6`), Light Mode (`#F8FAFC` / `#FFFFFF`), Dark Mode (`#0F172A` / `#1E293B`), serta tipografi `Plus Jakarta Sans` & `Inter`.
 
 ### 4.2 Penyimpanan Lokal (Hive) & Jaringan (Dio)
-- [ ] **Buat `lib/core/storage/local_storage_service.dart`:**
+- [x] **Buat `lib/core/storage/local_storage_service.dart`:**
   - Inisialisasi 3 Hive Box saat `main()` dimulai:
     1. `authBox`: Menyimpan Sanctum token, profil user, `plan_type`, dan `ai_quota_left`.
     2. `collectionsCacheBox`: Menyimpan daftar koleksi user agar `QuickTautBottomSheet` dapat membukanya dalam `0ms`.
     3. `offlineLinksQueueBox`: Menyimpan antrean link yang di-*share* saat HP tidak memiliki koneksi internet.
-- [ ] **Buat `lib/core/network/dio_client.dart`:**
+- [x] **Buat `lib/core/network/dio_client.dart`:**
   - Pasang interceptor untuk menyisipkan header `Authorization: Bearer {token}` dan menangkap `error_code` (`COLLECTION_LIMIT_REACHED`, `PRO_REQUIRED_FOR_REMINDER`, `PUBLIC_COLLECTION_LIMIT_REACHED`) agar dapat memicu pembukaan `PaywallScreen`.
 
 ### 4.3 Layar Onboarding, Login Google & Sinkronisasi Awal
-- [ ] **Buat `lib/features/auth/presentation/onboarding_login_screen.dart`:**
+- [x] **Buat `lib/features/auth/presentation/onboarding_login_screen.dart`:**
   - Tampilkan 3 slide singkat cara kerja Tautin (Share -> AI Merangkum -> Anti Lupa).
   - Tombol **"Lanjutkan dengan Google"** yang mengambil `idToken` dari `google_sign_in` dan mengirimkannya ke `POST /api/v1/auth/google`.
   - Setelah login berhasil, simpan daftar 5 koleksi bawaan ke `collectionsCacheBox` dan arahkan ke `HomeScreen`.
 
 ### 4.4 Fitur "Quick Taut" — Dirty URL Parser & Share Bottom Sheet
-- [ ] **Buat `lib/features/share_intent/domain/dirty_url_parser.dart`:**
+- [x] **Buat `lib/features/share_intent/domain/dirty_url_parser.dart`:**
   - Ekstrak URL pertama menggunakan Regex `r'(https?:\/\/[^\s\)\]\>\"\'`]+)'` sebagai `cleanUrl` dan pisahkan sisa teks promosi (seperti teks Shopee/Tokopedia) sebagai `rawDescription`.
-- [ ] **Buat `lib/features/share_intent/presentation/quick_taut_bottom_sheet.dart`:**
+- [x] **Buat `lib/features/share_intent/presentation/quick_taut_bottom_sheet.dart`:**
   - Dengarkan stream & initial media dari `ReceiveSharingIntent.instance`.
   - Begitu menerima teks dari aplikasi lain:
     1. Ekstrak URL melalui `DirtyUrlParser`. Jika tidak ada URL valid, tampilkan *toast* peringatan.
