@@ -22,6 +22,8 @@ class AppConfig {
   /// Host used by Android App Links (public collection viewer).
   static const String appLinksHost = 'www.sengganglabs.my.id';
   static const String appLinksPathPrefix = '/tautin/c/';
+  static String get publicCollectionBaseUrl => 'https://$appLinksHost$appLinksPathPrefix';
+  static String publicCollectionUrl(String slug) => '$publicCollectionBaseUrl$slug';
 
   /// Default collection chip shown first in the Quick Taut bottom sheet.
   static const String aiAutoCollectionChip = '✨ Otomatis oleh AI';

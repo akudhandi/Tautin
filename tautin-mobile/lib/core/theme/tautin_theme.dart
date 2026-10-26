@@ -3,44 +3,119 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Tautin brand palette (see PRD section 5.1).
+/// Tautin brand palette based on the official editorial mockup design.
+///
+/// Deep Spruce/Teal (`#204654`) + Soft Neon Mint (`#CAFFA6`) + Warm Cream (`#F7F9E1`).
 abstract final class TautinColors {
-  // Brand
-  static const Color primaryIndigo = Color(0xFF4F46E5);
-  static const Color aiViolet = Color(0xFF8B5CF6);
+  // Mockup Core Palette
+  static const Color brandTeal = Color(0xFF204654);
+  static const Color mintAccent = Color(0xFFCAFFA6);
+  static const Color creamBackground = Color(0xFFF7F9E1);
+  static const Color iceBlue = Color(0xFFA9E0F1);
+  static const Color mistTeal = Color(0xFFD6E6EA);
+  static const Color darkTeal = Color(0xFF16323D);
+  static const Color softBorder = Color(0xFFB9CDB0);
 
-  // Light mode
-  static const Color lightBackground = Color(0xFFF8FAFC);
+  // Backward-compatible Brand Aliases
+  static const Color primaryIndigo = brandTeal;
+  static const Color aiViolet = mintAccent;
+
+  // Light mode (Warm Cream & Clean Cards)
+  static const Color lightBackground = creamBackground;
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color textPrimaryLight = Color(0xFF0F172A);
-  static const Color textSecondaryLight = Color(0xFF64748B);
-  static const Color aiSummaryBoxLight = Color(0xFFF5F3FF);
-  static const Color aiSummaryBorderLight = Color(0xFFDDD6FE);
+  static const Color textPrimaryLight = brandTeal;
+  static const Color textSecondaryLight = Color(0xFF5A7580);
+  static const Color aiSummaryBoxLight = Color(0xFFFFFFFF);
+  static const Color aiSummaryBorderLight = mistTeal;
 
-  // Dark mode
-  static const Color darkBackground = Color(0xFF0F172A);
-  static const Color darkCard = Color(0xFF1E293B);
-  static const Color textPrimaryDark = Color(0xFFF8FAFC);
-  static const Color textSecondaryDark = Color(0xFF94A3B8);
-  static const Color aiSummaryBoxDark = Color(0xFF1E1B4B);
-  static const Color aiSummaryBorderDark = Color(0xFF4C1D95);
+  // Dark mode (Night Spruce)
+  static const Color darkBackground = darkTeal;
+  static const Color darkCard = Color(0xFF1E3A45);
+  static const Color textPrimaryDark = creamBackground;
+  static const Color textSecondaryDark = mistTeal;
+  static const Color aiSummaryBoxDark = Color(0xFF1A333C);
+  static const Color aiSummaryBorderDark = Color(0xFF2E5360);
 
   // Semantic
-  static const Color successGreen = Color(0xFF16A34A);
-  static const Color errorRed = Color(0xFFDC2626);
+  static const Color successGreen = Color(0xFF10B981);
+  static const Color errorRed = Color(0xFFEF4444);
   static const Color warningAmber = Color(0xFFF59E0B);
 }
 
-enum _FontKind { heading, body }
+enum _FontKind { heading, body, editorialSerif }
 
 /// Builds light and dark [ThemeData] for the whole app.
 ///
-/// Typography: `Plus Jakarta Sans` for headings and `Inter` for body text.
-/// Fonts are fetched from Google Fonts at runtime; during tests
-/// (`FLUTTER_TEST=1`) they are replaced by the default system font to keep
-/// widget tests deterministic and offline.
+/// Typography: `Plus Jakarta Sans` for titles/badges, `Instrument Serif` (italic)
+/// for editorial slogans, and `Inter` for body/notes.
 abstract final class TautinTheme {
-  static bool get _fontsEnabled => !Platform.environment.containsKey('FLUTTER_TEST');
+  static bool get _fontsEnabled =>
+      !Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Quick helper for Instrument Serif italic headlines (e.g. slogans).
+  static TextStyle editorialSerif({
+    double fontSize = 36,
+    Color color = TautinColors.brandTeal,
+    FontWeight fontWeight = FontWeight.w400,
+  }) {
+    if (!_fontsEnabled) {
+      return TextStyle(
+        fontStyle: FontStyle.italic,
+        fontSize: fontSize,
+        color: color,
+        fontWeight: fontWeight,
+      );
+    }
+    return GoogleFonts.instrumentSerif(
+      fontStyle: FontStyle.italic,
+      fontSize: fontSize,
+      color: color,
+      fontWeight: fontWeight,
+    );
+  }
+
+  /// Quick helper for Plus Jakarta Sans headings.
+  static TextStyle jakartaHeading({
+    double fontSize = 28,
+    Color color = TautinColors.brandTeal,
+    FontWeight fontWeight = FontWeight.w800,
+    double? letterSpacing = -0.025,
+  }) {
+    if (!_fontsEnabled) {
+      return TextStyle(
+        fontSize: fontSize,
+        color: color,
+        fontWeight: fontWeight,
+        letterSpacing: letterSpacing,
+      );
+    }
+    return GoogleFonts.plusJakartaSans(
+      fontSize: fontSize,
+      color: color,
+      fontWeight: fontWeight,
+      letterSpacing: letterSpacing,
+    );
+  }
+
+  /// Quick helper for Inter body text.
+  static TextStyle interBody({
+    double fontSize = 14,
+    Color color = TautinColors.brandTeal,
+    FontWeight fontWeight = FontWeight.w400,
+  }) {
+    if (!_fontsEnabled) {
+      return TextStyle(
+        fontSize: fontSize,
+        color: color,
+        fontWeight: fontWeight,
+      );
+    }
+    return GoogleFonts.inter(
+      fontSize: fontSize,
+      color: color,
+      fontWeight: fontWeight,
+    );
+  }
 
   static ThemeData get light {
     return _base(
@@ -73,7 +148,7 @@ abstract final class TautinTheme {
     required Color inputFill,
   }) {
     final ColorScheme scheme = ColorScheme.fromSeed(
-      seedColor: TautinColors.primaryIndigo,
+      seedColor: TautinColors.brandTeal,
       brightness: brightness,
       surface: card,
     );
@@ -85,7 +160,7 @@ abstract final class TautinTheme {
     final bool lightMode = brightness == Brightness.light;
 
     final OutlinedBorder buttonShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
     );
 
     return ThemeData(
@@ -102,7 +177,7 @@ abstract final class TautinTheme {
         titleTextStyle: _font(
           _FontKind.heading,
           size: 19,
-          weight: FontWeight.w600,
+          weight: FontWeight.w700,
           color: textPrimary,
         ),
       ),
@@ -110,8 +185,8 @@ abstract final class TautinTheme {
         color: card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: textSecondary.withValues(alpha: 0.18)),
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: textSecondary.withValues(alpha: 0.16)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -119,130 +194,231 @@ abstract final class TautinTheme {
         fillColor: inputFill,
         hintStyle: _font(_FontKind.body, size: 14, color: textSecondary),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textSecondary.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: textSecondary.withValues(alpha: 0.24)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textSecondary.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: textSecondary.withValues(alpha: 0.24)),
         ),
         focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: TautinColors.primaryIndigo, width: 1.6),
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide(color: TautinColors.brandTeal, width: 1.6),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor:
-            lightMode ? TautinColors.textPrimaryLight : TautinColors.darkCard,
+            lightMode ? TautinColors.brandTeal : TautinColors.darkCard,
         contentTextStyle: _font(
           _FontKind.body,
           size: 13.5,
-          color:
-              lightMode
-                  ? TautinColors.textPrimaryDark
-                  : TautinColors.textPrimaryLight,
+          color: TautinColors.creamBackground,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: card,
-        selectedColor: TautinColors.primaryIndigo.withValues(alpha: 0.14),
-        side: BorderSide(color: textSecondary.withValues(alpha: 0.28)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        selectedColor: TautinColors.mintAccent,
+        side: BorderSide(color: textSecondary.withValues(alpha: 0.25)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         labelStyle: _font(_FontKind.body, size: 13, color: textPrimary),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: TautinColors.primaryIndigo,
-          foregroundColor: Colors.white,
+          backgroundColor: TautinColors.brandTeal,
+          foregroundColor: TautinColors.creamBackground,
           minimumSize: const Size.fromHeight(52),
-          textStyle: _font(_FontKind.body, size: 15.5, weight: FontWeight.w600),
+          textStyle: _font(_FontKind.heading, size: 15.5, weight: FontWeight.w700),
           shape: buttonShape,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: TautinColors.primaryIndigo,
+          foregroundColor: TautinColors.brandTeal,
           minimumSize: const Size.fromHeight(50),
-          side: const BorderSide(color: TautinColors.primaryIndigo),
-          textStyle: _font(_FontKind.body, size: 15, weight: FontWeight.w600),
+          side: const BorderSide(color: TautinColors.brandTeal),
+          textStyle: _font(_FontKind.heading, size: 15, weight: FontWeight.w700),
           shape: buttonShape,
         ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor:
-              lightMode ? TautinColors.primaryIndigo : TautinColors.aiViolet,
-          textStyle: _font(_FontKind.body, size: 14, weight: FontWeight.w600),
-        ),
-      ),
-      progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: TautinColors.aiViolet,
-        linearTrackColor: textSecondary.withValues(alpha: 0.2),
-      ),
-      dividerTheme: DividerThemeData(
-        color: textSecondary.withValues(alpha: 0.18),
       ),
     );
   }
 
   static TextTheme _headingTextTheme(Color primary) {
     return TextTheme(
-      displaySmall: _font(_FontKind.heading, size: 32, weight: FontWeight.w700, color: primary),
-      headlineMedium: _font(_FontKind.heading, size: 26, weight: FontWeight.w700, color: primary),
-      headlineSmall: _font(_FontKind.heading, size: 22, weight: FontWeight.w700, color: primary),
-      titleLarge: _font(_FontKind.heading, size: 19, weight: FontWeight.w600, color: primary),
-      titleMedium: _font(_FontKind.heading, size: 16.5, weight: FontWeight.w600, color: primary),
-      titleSmall: _font(_FontKind.heading, size: 14.5, weight: FontWeight.w600, color: primary),
+      displayLarge: _font(_FontKind.heading, size: 40, weight: FontWeight.w800, color: primary),
+      displayMedium: _font(_FontKind.heading, size: 32, weight: FontWeight.w800, color: primary),
+      displaySmall: _font(_FontKind.heading, size: 28, weight: FontWeight.w700, color: primary),
+      headlineMedium: _font(_FontKind.heading, size: 24, weight: FontWeight.w700, color: primary),
+      headlineSmall: _font(_FontKind.heading, size: 20, weight: FontWeight.w700, color: primary),
+      titleLarge: _font(_FontKind.heading, size: 18, weight: FontWeight.w700, color: primary),
+      titleMedium: _font(_FontKind.heading, size: 16, weight: FontWeight.w600, color: primary),
+      titleSmall: _font(_FontKind.heading, size: 14, weight: FontWeight.w600, color: primary),
     );
   }
 
   static TextTheme _bodyTextTheme(Color primary, Color secondary) {
     return TextTheme(
-      bodyLarge: _font(_FontKind.body, size: 15, color: primary, height: 1.5),
-      bodyMedium: _font(_FontKind.body, size: 14, color: primary, height: 1.45),
-      bodySmall: _font(_FontKind.body, size: 12.5, color: secondary, height: 1.4),
-      labelLarge: _font(_FontKind.body, size: 14, weight: FontWeight.w600, color: primary),
-      labelMedium: _font(_FontKind.body, size: 12.5, color: secondary),
+      bodyLarge: _font(_FontKind.body, size: 16, color: primary),
+      bodyMedium: _font(_FontKind.body, size: 14, color: primary),
+      bodySmall: _font(_FontKind.body, size: 12.5, color: secondary),
+      labelLarge: _font(_FontKind.heading, size: 14, weight: FontWeight.w700, color: primary),
+      labelMedium: _font(_FontKind.body, size: 12, weight: FontWeight.w600, color: primary),
       labelSmall: _font(_FontKind.body, size: 11, color: secondary),
     );
   }
 
   static TextStyle _font(
     _FontKind kind, {
-    double? size,
-    FontWeight? weight,
+    required double size,
+    FontWeight weight = FontWeight.w400,
     Color? color,
-    double? height,
-    double? letterSpacing,
   }) {
     if (!_fontsEnabled) {
-      return TextStyle(
-        fontSize: size,
-        fontWeight: weight,
-        color: color,
-        height: height,
-        letterSpacing: letterSpacing,
-      );
+      return TextStyle(fontSize: size, fontWeight: weight, color: color);
+    }
+    switch (kind) {
+      case _FontKind.heading:
+        return GoogleFonts.plusJakartaSans(
+          fontSize: size,
+          fontWeight: weight,
+          color: color,
+        );
+      case _FontKind.body:
+        return GoogleFonts.inter(
+          fontSize: size,
+          fontWeight: weight,
+          color: color,
+        );
+      case _FontKind.editorialSerif:
+        return GoogleFonts.instrumentSerif(
+          fontStyle: FontStyle.italic,
+          fontSize: size,
+          fontWeight: weight,
+          color: color,
+        );
+    }
+  }
+}
+
+/// Custom painter for the 9-circle Tautin flower logo with 't' center.
+class TautinFlowerPainter extends CustomPainter {
+  const TautinFlowerPainter({
+    this.fillColor = TautinColors.mintAccent,
+    this.letterColor = TautinColors.brandTeal,
+  });
+
+  final Color fillColor;
+  final Color letterColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
+
+    final double scale = size.width / 100.0;
+    canvas.save();
+    canvas.scale(scale, scale);
+
+    // Center circle
+    canvas.drawCircle(const Offset(50, 50), 34, paint);
+
+    // 8 Outer petals
+    const List<Offset> outerOffsets = <Offset>[
+      Offset(80, 50),
+      Offset(71.2, 71.2),
+      Offset(50, 80),
+      Offset(28.8, 71.2),
+      Offset(20, 50),
+      Offset(28.8, 28.8),
+      Offset(50, 20),
+      Offset(71.2, 28.8),
+    ];
+
+    for (final Offset pt in outerOffsets) {
+      canvas.drawCircle(pt, 17, paint);
     }
 
-    if (kind == _FontKind.heading) {
-      return GoogleFonts.plusJakartaSans(
-        fontSize: size,
-        fontWeight: weight,
-        color: color,
-        height: height,
-        letterSpacing: letterSpacing,
-      );
-    }
-    return GoogleFonts.inter(
-      fontSize: size,
-      fontWeight: weight,
-      color: color,
-      height: height,
-      letterSpacing: letterSpacing,
+    // Letter 't'
+    final TextPainter tp = TextPainter(
+      text: TextSpan(
+        text: 't',
+        style: TextStyle(
+          color: letterColor,
+          fontSize: 46,
+          fontWeight: FontWeight.w800,
+          fontFamily: 'Plus Jakarta Sans',
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    tp.paint(canvas, Offset(50 - tp.width / 2, 50 - tp.height / 2 - 2));
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant TautinFlowerPainter oldDelegate) =>
+      oldDelegate.fillColor != fillColor ||
+      oldDelegate.letterColor != letterColor;
+}
+
+/// Reusable brand logo icon widget.
+class TautinLogoIcon extends StatelessWidget {
+  const TautinLogoIcon({
+    super.key,
+    this.size = 36,
+    this.petalColor = TautinColors.mintAccent,
+    this.letterColor = TautinColors.brandTeal,
+  });
+
+  final double size;
+  final Color petalColor;
+  final Color letterColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: TautinFlowerPainter(
+          fillColor: petalColor,
+          letterColor: letterColor,
+        ),
+      ),
+    );
+  }
+}
+
+/// Brand logo row with icon and 'tautin' wordmark.
+class TautinBrandHeader extends StatelessWidget {
+  const TautinBrandHeader({super.key, this.iconSize = 34, this.fontSize = 22});
+
+  final double iconSize;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        TautinLogoIcon(size: iconSize),
+        const SizedBox(width: 8),
+        Text(
+          'tautin',
+          style: TautinTheme.jakartaHeading(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w800,
+            color: TautinColors.brandTeal,
+            letterSpacing: -0.03,
+          ),
+        ),
+      ],
     );
   }
 }

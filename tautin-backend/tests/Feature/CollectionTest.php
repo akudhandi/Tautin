@@ -55,14 +55,14 @@ class CollectionTest extends TestCase
         ]);
 
         // Signup seeds 5 default collections (is_default = true); they never
-        // count toward the 3 custom-collection slots.
+        // count toward the 10 custom-collection slots.
         app(SeedDefaultCollectionsAction::class)->execute($user);
         $this->assertEquals(5, $user->collections()->where('is_default', true)->count());
 
         $token = $user->createToken('test')->plainTextToken;
 
-        // The first 3 custom collections succeed...
-        for ($i = 1; $i <= 3; $i++) {
+        // The first 10 custom collections succeed...
+        for ($i = 1; $i <= 10; $i++) {
             $this->withHeader('Authorization', 'Bearer '.$token)
                 ->postJson('/api/v1/collections', [
                     'name' => 'Koleksi Kustom '.$i,
@@ -70,10 +70,10 @@ class CollectionTest extends TestCase
                 ->assertStatus(201);
         }
 
-        // ...and the 4th custom collection is rejected.
+        // ...and the 11th custom collection is rejected.
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/collections', [
-                'name' => 'Koleksi Kustom 4',
+                'name' => 'Koleksi Kustom 11',
                 'icon' => 'folder',
                 'color' => '#3B82F6',
             ]);
@@ -84,8 +84,8 @@ class CollectionTest extends TestCase
                 'error_code' => 'COLLECTION_LIMIT_REACHED',
             ]);
 
-        // 5 seeded defaults + 3 custom collections.
-        $this->assertEquals(8, $user->collections()->count());
+        // 5 seeded defaults + 10 custom collections.
+        $this->assertEquals(15, $user->collections()->count());
     }
 
     public function test_pro_user_can_create_more_than_five_collections(): void

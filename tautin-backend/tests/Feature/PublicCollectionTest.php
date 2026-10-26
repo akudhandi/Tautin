@@ -186,8 +186,8 @@ class PublicCollectionTest extends TestCase
             'plan_type' => 'free',
         ]);
 
-        // Max out user's 5 collections
-        for ($i = 1; $i <= 5; $i++) {
+        // Max out user's 10 custom collections
+        for ($i = 1; $i <= 10; $i++) {
             Collection::create([
                 'user_id' => $freeUser->id,
                 'name' => 'Koleksi '.$i,

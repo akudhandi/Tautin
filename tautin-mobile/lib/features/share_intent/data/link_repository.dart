@@ -24,7 +24,22 @@ class QuickSaveOutcome {
   final String? planType;
 }
 
-/// Contract for authoring/update of links used by the Quick Taut sheet.
+/// Paginated link list result from `GET /api/v1/links`.
+class PaginatedLinks {
+  const PaginatedLinks({
+    required this.links,
+    required this.currentPage,
+    required this.lastPage,
+    required this.total,
+  });
+
+  final List<LinkModel> links;
+  final int currentPage;
+  final int lastPage;
+  final int total;
+}
+
+/// Contract for link operations across mobile app (Quick Taut, Home, Detail).
 abstract interface class LinkRepository {
   Future<QuickSaveOutcome> quickSave({
     required String url,
@@ -40,7 +55,26 @@ abstract interface class LinkRepository {
     bool? isPinned,
     bool? isRead,
     String? title,
+    DateTime? remindAt,
   });
+
+  Future<PaginatedLinks> fetchLinks({
+    int page = 1,
+    int? collectionId,
+    bool unassigned = false,
+    String? sourceType,
+    String? tag,
+    bool? isRead,
+    String? search,
+  });
+
+  Future<List<LinkModel>> fetchResurface();
+
+  Future<LinkModel> fetchLink(int id);
+
+  Future<void> deleteLink(int id);
+
+  Future<LinkModel> regenerateAi(int id);
 }
 
 /// HTTP implementation on top of the shared Dio client.
@@ -89,6 +123,7 @@ class TautinLinkRepository implements LinkRepository {
     bool? isPinned,
     bool? isRead,
     String? title,
+    DateTime? remindAt,
   }) async {
     final Response<dynamic> response = await _dio.patch<Object?>(
       '/links/$id',
@@ -98,9 +133,92 @@ class TautinLinkRepository implements LinkRepository {
         if (isPinned != null) 'is_pinned': isPinned,
         if (isRead != null) 'is_read': isRead,
         if (title != null) 'title': title,
+        if (remindAt != null) 'remind_at': remindAt.toIso8601String(),
       },
     );
 
+    final ApiEnvelope envelope = ApiEnvelope.requireSuccess(response);
+    final Map<String, dynamic> data =
+        (envelope.data as Map? ?? <Object?, Object?>{}).cast<String, dynamic>();
+    return LinkModel.fromJson(data);
+  }
+
+  @override
+  Future<PaginatedLinks> fetchLinks({
+    int page = 1,
+    int? collectionId,
+    bool unassigned = false,
+    String? sourceType,
+    String? tag,
+    bool? isRead,
+    String? search,
+  }) async {
+    final Map<String, dynamic> query = <String, dynamic>{
+      'page': page,
+      if (unassigned)
+        'collection_id': 'unassigned'
+      else if (collectionId != null)
+        'collection_id': collectionId,
+      if (sourceType != null && sourceType.isNotEmpty) 'source_type': sourceType,
+      if (tag != null && tag.isNotEmpty) 'tag': tag,
+      if (isRead != null) 'is_read': isRead ? 1 : 0,
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+    };
+
+    final Response<dynamic> response = await _dio.get<Object?>(
+      '/links',
+      queryParameters: query,
+    );
+
+    final ApiEnvelope envelope = ApiEnvelope.requireSuccess(response);
+    final Map<String, dynamic> data =
+        (envelope.data as Map? ?? <Object?, Object?>{}).cast<String, dynamic>();
+
+    final List<dynamic> items = data['data'] as List<dynamic>? ?? <dynamic>[];
+    final List<LinkModel> links = items
+        .map((dynamic item) =>
+            LinkModel.fromJson((item as Map).cast<String, dynamic>()))
+        .toList();
+
+    return PaginatedLinks(
+      links: links,
+      currentPage: data['current_page'] as int? ?? 1,
+      lastPage: data['last_page'] as int? ?? 1,
+      total: data['total'] as int? ?? links.length,
+    );
+  }
+
+  @override
+  Future<List<LinkModel>> fetchResurface() async {
+    final Response<dynamic> response = await _dio.get<Object?>('/links/resurface');
+    final ApiEnvelope envelope = ApiEnvelope.requireSuccess(response);
+    final List<dynamic> items =
+        envelope.data as List<dynamic>? ?? <dynamic>[];
+    return items
+        .map((dynamic item) =>
+            LinkModel.fromJson((item as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
+  @override
+  Future<LinkModel> fetchLink(int id) async {
+    final Response<dynamic> response = await _dio.get<Object?>('/links/$id');
+    final ApiEnvelope envelope = ApiEnvelope.requireSuccess(response);
+    final Map<String, dynamic> data =
+        (envelope.data as Map? ?? <Object?, Object?>{}).cast<String, dynamic>();
+    return LinkModel.fromJson(data);
+  }
+
+  @override
+  Future<void> deleteLink(int id) async {
+    final Response<dynamic> response = await _dio.delete<Object?>('/links/$id');
+    ApiEnvelope.requireSuccess(response);
+  }
+
+  @override
+  Future<LinkModel> regenerateAi(int id) async {
+    final Response<dynamic> response =
+        await _dio.post<Object?>('/links/$id/regenerate-ai');
     final ApiEnvelope envelope = ApiEnvelope.requireSuccess(response);
     final Map<String, dynamic> data =
         (envelope.data as Map? ?? <Object?, Object?>{}).cast<String, dynamic>();

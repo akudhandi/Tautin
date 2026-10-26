@@ -88,6 +88,7 @@ class _FakeLinkRepository implements LinkRepository {
     bool? isPinned,
     bool? isRead,
     String? title,
+    DateTime? remindAt,
   }) {
     final _PatchRecord record = _PatchRecord(
       id: id,
@@ -102,6 +103,9 @@ class _FakeLinkRepository implements LinkRepository {
     }
     return Future<LinkModel>.sync(() => handler(record));
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 const LinkModel _kSavedShopeeLink = LinkModel(

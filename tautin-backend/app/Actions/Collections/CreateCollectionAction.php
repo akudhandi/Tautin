@@ -14,13 +14,13 @@ class CreateCollectionAction
      * The 5 default collections (`is_default = true`) seeded on signup are
      * free. This limit only counts user-created custom collections
      * (`is_default = false`), so a free user can end up with at most
-     * 5 default + 3 custom collections.
+     * 5 default + 10 custom collections.
      *
      * @param  array{name: string, icon?: ?string, color?: ?string, is_public?: ?bool}  $data
      */
     public function execute(User $user, array $data): Collection
     {
-        $maxCustomCollections = (int) config('tautin.free_plan.max_custom_collections', 3);
+        $maxCustomCollections = (int) config('tautin.free_plan.max_custom_collections', 10);
 
         if (! $user->isPro()
             && $user->collections()->where('is_default', false)->count() >= $maxCustomCollections

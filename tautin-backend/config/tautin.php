@@ -5,7 +5,7 @@ return [
         // 5 default (is_default = true) collections are seeded on signup and are
         // free-of-charge. The limit below only counts user-created custom
         // collections (is_default = false).
-        'max_custom_collections' => 3,
+        'max_custom_collections' => 10,
         'max_public_collections' => 1,
         'monthly_ai_quota' => 10,
     ],

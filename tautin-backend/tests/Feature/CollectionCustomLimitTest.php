@@ -19,14 +19,14 @@ class CollectionCustomLimitTest extends TestCase
         ]);
         $token = $user->createToken('test')->plainTextToken;
 
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 10; $i++) {
             $response = $this->withHeader('Authorization', 'Bearer '.$token)
                 ->postJson('/api/v1/collections', ['name' => 'Koleksi Kustom '.$i]);
 
             $response->assertStatus(201);
         }
 
-        $this->assertEquals(3, $user->collections()->where('is_default', false)->count());
+        $this->assertEquals(10, $user->collections()->where('is_default', false)->count());
     }
 
     public function test_fourth_custom_collection_is_rejected_with_exact_message(): void
@@ -38,20 +38,20 @@ class CollectionCustomLimitTest extends TestCase
         ]);
         $token = $user->createToken('test')->plainTextToken;
 
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 10; $i++) {
             $this->withHeader('Authorization', 'Bearer '.$token)
                 ->postJson('/api/v1/collections', ['name' => 'Koleksi Kustom '.$i])
                 ->assertStatus(201);
         }
 
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/collections', ['name' => 'Koleksi Kustom 4']);
+            ->postJson('/api/v1/collections', ['name' => 'Koleksi Kustom 11']);
 
         $response->assertStatus(403)
             ->assertJson([
                 'success' => false,
                 'error_code' => 'COLLECTION_LIMIT_REACHED',
-                'message' => 'Batas pembuatan koleksi kustom untuk akun Gratis (3 koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!',
+                'message' => 'Batas pembuatan koleksi kustom untuk akun Gratis (10 koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!',
             ]);
     }
 
@@ -69,21 +69,21 @@ class CollectionCustomLimitTest extends TestCase
 
         $this->assertEquals(5, $user->collections()->where('is_default', true)->count());
 
-        // All 3 custom slots remain available next to the 5 seeded defaults.
-        for ($i = 1; $i <= 3; $i++) {
+        // All 10 custom slots remain available next to the 5 seeded defaults.
+        for ($i = 1; $i <= 10; $i++) {
             $this->withHeader('Authorization', 'Bearer '.$token)
                 ->postJson('/api/v1/collections', ['name' => 'Koleksi Mega '.$i])
                 ->assertStatus(201);
         }
 
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/collections', ['name' => 'Koleksi Mega 4']);
+            ->postJson('/api/v1/collections', ['name' => 'Koleksi Mega 11']);
 
         $response->assertStatus(403)
             ->assertJson(['error_code' => 'COLLECTION_LIMIT_REACHED']);
 
         $user->refresh();
-        $this->assertEquals(8, $user->collections()->count());
+        $this->assertEquals(15, $user->collections()->count());
     }
 
     public function test_pro_user_can_create_custom_collections_without_limit(): void
@@ -126,7 +126,7 @@ class CollectionCustomLimitTest extends TestCase
         ]);
         $token = $user->createToken('test')->plainTextToken;
 
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 10; $i++) {
             $this->withHeader('Authorization', 'Bearer '.$token)
                 ->postJson('/api/v1/collections', ['name' => 'Koleksi Cloe '.$i])
                 ->assertStatus(201);
@@ -139,7 +139,7 @@ class CollectionCustomLimitTest extends TestCase
             ->assertJson([
                 'success' => false,
                 'error_code' => 'COLLECTION_LIMIT_REACHED',
-                'message' => 'Batas pembuatan koleksi kustom untuk akun Gratis (3 koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!',
+                'message' => 'Batas pembuatan koleksi kustom untuk akun Gratis (10 koleksi tambahan) telah tercapai. Upgrade ke Tautin Pro untuk membuat koleksi tanpa batas!',
             ]);
     }
 }

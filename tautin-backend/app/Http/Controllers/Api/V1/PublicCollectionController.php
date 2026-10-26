@@ -75,7 +75,7 @@ class PublicCollectionController extends Controller
         // Tier limit check for free users: only custom collections count, so a
         // free user can always keep their 5 default collections plus up to
         // `max_custom_collections` self-made folders.
-        $maxCustomCollections = (int) config('tautin.free_plan.max_custom_collections', 3);
+        $maxCustomCollections = (int) config('tautin.free_plan.max_custom_collections', 10);
         if (! $user->isPro()
             && $user->collections()->where('is_default', false)->count() >= $maxCustomCollections
         ) {

@@ -18,6 +18,10 @@ abstract interface class AuthRepository {
   Future<AuthSession> loginWithGoogleIdToken(String idToken, {String? fcmToken});
 
   Future<void> logout();
+
+  Future<UserModel> fetchCurrentUser();
+
+  Future<void> deleteAccount(String confirmation);
 }
 
 /// HTTP implementation backed by Dio + Hive.
@@ -84,6 +88,31 @@ class TautinAuthRepository implements AuthRepository {
   Future<void> logout() async {
     // No server-side revoke endpoint in Phase 1-3; dropping the local Sanctum
     // token + mirrors is enough and always succeeds, even offline.
+    await _storage.clearSession();
+    await _storage.clearCollections();
+  }
+
+  @override
+  Future<UserModel> fetchCurrentUser() async {
+    final Response<dynamic> response = await _dio.get<Object?>('/auth/me');
+    final ApiEnvelope envelope = ApiEnvelope.requireSuccess(response);
+    final Map<String, dynamic> data =
+        (envelope.data as Map? ?? <Object?, Object?>{}).cast<String, dynamic>();
+
+    final UserModel user = UserModel.fromJson(
+      (data['user'] as Map? ?? <Object?, Object?>{}).cast<String, dynamic>(),
+    );
+    _storage.saveUser(user);
+    return user;
+  }
+
+  @override
+  Future<void> deleteAccount(String confirmation) async {
+    final Response<dynamic> response = await _dio.delete<Object?>(
+      '/auth/account',
+      data: <String, dynamic>{'confirmation': confirmation},
+    );
+    ApiEnvelope.requireSuccess(response);
     await _storage.clearSession();
     await _storage.clearCollections();
   }

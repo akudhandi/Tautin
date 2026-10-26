@@ -49,9 +49,13 @@ class _ScriptedLinkRepository implements LinkRepository {
     bool? isPinned,
     bool? isRead,
     String? title,
+    DateTime? remindAt,
   }) {
     throw UnimplementedError('updateLink is not exercised in these tests');
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 const LinkModel _kAnyLink = LinkModel(
