@@ -324,4 +324,35 @@ class LinkFeedAndSearchTest extends TestCase
 
         $this->assertDatabaseMissing('links', ['id' => $link->id]);
     }
+
+    public function test_feed_clamps_per_page_to_valid_range(): void
+    {
+        $user = User::create([
+            'name' => 'Irfan Page',
+            'email' => 'irfan@example.com',
+        ]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        for ($i = 1; $i <= 5; $i++) {
+            Link::create([
+                'user_id' => $user->id,
+                'url' => 'https://example.com/p'.$i,
+                'url_hash' => hash('sha256', 'https://example.com/p'.$i),
+                'domain' => 'example.com',
+                'title' => 'Page Link '.$i,
+            ]);
+        }
+
+        // Test upper clamp: per_page=500 should be clamped to 100
+        $responseMax = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/links?per_page=500');
+        $responseMax->assertStatus(200)
+            ->assertJsonPath('data.per_page', 100);
+
+        // Test lower clamp: per_page=0 or negative should be clamped to 1
+        $responseMin = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/links?per_page=0');
+        $responseMin->assertStatus(200)
+            ->assertJsonPath('data.per_page', 1);
+    }
 }

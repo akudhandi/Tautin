@@ -73,7 +73,7 @@ class User extends Authenticatable
      */
     public function hasAiQuota(): bool
     {
-        return $this->isPro() || $this->ai_quota_left > 0;
+        return $this->ai_quota_left > 0;
     }
 
     /**

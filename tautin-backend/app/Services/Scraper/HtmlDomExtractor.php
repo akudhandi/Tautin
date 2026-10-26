@@ -23,6 +23,7 @@ class HtmlDomExtractor
             $response = Http::withOptions([
                 'timeout' => 8,
                 'connect_timeout' => 4,
+                'stream' => true,
                 'headers' => [
                     'User-Agent' => 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
                     'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -34,14 +35,20 @@ class HtmlDomExtractor
                 return null;
             }
 
-            $contentType = $response->header('Content-Type') ?? '';
+            $contentType = (string) ($response->header('Content-Type') ?? '');
             if (! str_contains(strtolower($contentType), 'text/html') && ! str_contains(strtolower($contentType), 'application/xhtml+xml')) {
                 return null;
             }
 
-            $body = (string) $response->body();
-            if (strlen($body) > self::MAX_BYTES) {
-                $body = substr($body, 0, self::MAX_BYTES);
+            // Stream reading up to MAX_BYTES (1.5 MB) to avoid memory exhaustion
+            $stream = $response->toPsrResponse()->getBody();
+            $body = '';
+            while (! $stream->eof() && strlen($body) < self::MAX_BYTES) {
+                $chunk = $stream->read(8192);
+                if ($chunk === '') {
+                    break;
+                }
+                $body .= $chunk;
             }
 
             if (empty(trim($body))) {
@@ -198,7 +205,7 @@ class HtmlDomExtractor
     /**
      * Resolve relative image URL to absolute URL.
      */
-    protected function resolveAbsoluteUrl(string $baseUrl, string $relativeUrl): string
+    public function resolveAbsoluteUrl(string $baseUrl, string $relativeUrl): string
     {
         $relativeUrl = trim($relativeUrl);
 
@@ -229,6 +236,16 @@ class HtmlDomExtractor
             $dir = '';
         }
 
-        return $base.'/'.ltrim($dir.'/'.$relativeUrl, '/');
+        $rawPath = '/'.ltrim($dir.'/'.$relativeUrl, '/');
+        $segments = [];
+        foreach (explode('/', $rawPath) as $segment) {
+            if ($segment === '..') {
+                array_pop($segments);
+            } elseif ($segment !== '.' && $segment !== '') {
+                $segments[] = $segment;
+            }
+        }
+
+        return $base.'/'.implode('/', $segments);
     }
 }

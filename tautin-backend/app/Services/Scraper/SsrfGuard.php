@@ -61,6 +61,7 @@ class SsrfGuard
                     'connect_timeout' => 4,
                     'timeout' => 8,
                     'allow_redirects' => false,
+                    'stream' => true,
                     'headers' => [
                         'User-Agent' => 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
                     ],

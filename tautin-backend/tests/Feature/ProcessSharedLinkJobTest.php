@@ -302,4 +302,157 @@ HTML;
         $existingLink->refresh();
         $this->assertEquals('Catatan baru dari share kedua', $existingLink->user_notes);
     }
+
+    public function test_job_matches_collection_case_insensitively(): void
+    {
+        Config::set('tautin.gemini.api_key', 'mock_gemini_key');
+
+        $user = User::create([
+            'name' => 'Tomi',
+            'email' => 'tomi@example.com',
+            'plan_type' => 'free',
+            'ai_quota_left' => 10,
+        ]);
+        app(SeedDefaultCollectionsAction::class)->execute($user);
+
+        $link = Link::create([
+            'user_id' => $user->id,
+            'url' => 'https://example.com/masak-ayam',
+            'url_hash' => hash('sha256', 'https://example.com/masak-ayam'),
+            'domain' => 'example.com',
+            'status' => 'pending',
+        ]);
+
+        Http::fake([
+            'https://example.com/masak-ayam' => Http::response('<html>Ayam</html>', 200, ['Content-Type' => 'text/html']),
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => json_encode([
+                                        'clean_title' => 'Resep Ayam Kecap Lezat',
+                                        'summary' => 'Panduan memasak ayam kecap dengan bumbu meresap.',
+                                        'selected_collection_name' => 'resep & KULINER', // Case mismatch
+                                        'tags' => ['masak', 'ayam'],
+                                        'source_type' => 'article',
+                                    ]),
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        app(ProcessSharedLinkJob::class, ['linkId' => $link->id])->handle(
+            app(SsrfGuard::class),
+            app(MultiLayerScraperService::class),
+            app(GeminiOrganizerService::class)
+        );
+
+        $link->refresh();
+        $user->refresh();
+
+        $resepCol = $user->collections()->where('name', 'Resep & Kuliner')->first();
+        $this->assertNotNull($resepCol);
+        $this->assertEquals($resepCol->id, $link->collection_id);
+        $this->assertEquals(9, $user->ai_quota_left);
+    }
+
+    public function test_pro_user_with_exhausted_quota_skips_ai(): void
+    {
+        Config::set('tautin.gemini.api_key', 'mock_gemini_key');
+
+        $user = User::create([
+            'name' => 'Pro Limit User',
+            'email' => 'prolimit@example.com',
+            'plan_type' => 'pro',
+            'plan_expires_at' => now()->addMonth(),
+            'ai_quota_left' => 0, // Fair-use cap reached
+        ]);
+        app(SeedDefaultCollectionsAction::class)->execute($user);
+
+        $link = Link::create([
+            'user_id' => $user->id,
+            'url' => 'https://example.com/artikel-pro',
+            'url_hash' => hash('sha256', 'https://example.com/artikel-pro'),
+            'domain' => 'example.com',
+            'status' => 'pending',
+        ]);
+
+        Http::fake([
+            'https://example.com/artikel-pro' => Http::response('<html><title>Artikel Khusus</title></html>', 200, ['Content-Type' => 'text/html']),
+        ]);
+
+        app(ProcessSharedLinkJob::class, ['linkId' => $link->id])->handle(
+            app(SsrfGuard::class),
+            app(MultiLayerScraperService::class),
+            app(GeminiOrganizerService::class)
+        );
+
+        $link->refresh();
+        $user->refresh();
+
+        $this->assertEquals('completed', $link->status);
+        $this->assertFalse($link->is_ai_processed);
+        $this->assertEquals('Artikel Khusus', $link->title);
+        $this->assertEquals(0, $user->ai_quota_left);
+    }
+
+    public function test_job_recovers_gracefully_from_duplicate_key_query_exception(): void
+    {
+        Config::set('tautin.gemini.api_key', null);
+
+        $user = User::create([
+            'name' => 'Collision User',
+            'email' => 'collision@example.com',
+            'plan_type' => 'free',
+            'ai_quota_left' => 10,
+        ]);
+
+        $canonicalUrl = 'https://example.com/target-article';
+        $canonicalHash = hash('sha256', $canonicalUrl);
+
+        // Pre-create the colliding canonical link to simulate race condition insert
+        $existingLink = Link::create([
+            'user_id' => $user->id,
+            'url' => $canonicalUrl,
+            'url_hash' => $canonicalHash,
+            'domain' => 'example.com',
+            'title' => 'First Inserted Title',
+            'status' => 'completed',
+        ]);
+
+        // Second link started with short URL, will resolve to same canonical URL
+        $racingLink = Link::create([
+            'user_id' => $user->id,
+            'url' => 'https://tinyurl.com/xyz99',
+            'url_hash' => hash('sha256', 'https://tinyurl.com/xyz99'),
+            'domain' => 'tinyurl.com',
+            'user_notes' => 'Catatan dari request kedua',
+            'status' => 'pending',
+        ]);
+
+        Http::fake([
+            'https://tinyurl.com/xyz99' => Http::response('', 301, [
+                'Location' => $canonicalUrl,
+            ]),
+            $canonicalUrl => Http::response('<html><title>Second Scraped Title</title></html>', 200, ['Content-Type' => 'text/html']),
+        ]);
+
+        app(ProcessSharedLinkJob::class, ['linkId' => $racingLink->id])->handle(
+            app(SsrfGuard::class),
+            app(MultiLayerScraperService::class),
+            app(GeminiOrganizerService::class)
+        );
+
+        // Racing link row was deleted
+        $this->assertDatabaseMissing('links', ['id' => $racingLink->id]);
+
+        // Existing link was updated with user_notes
+        $existingLink->refresh();
+        $this->assertEquals('Catatan dari request kedua', $existingLink->user_notes);
+    }
 }

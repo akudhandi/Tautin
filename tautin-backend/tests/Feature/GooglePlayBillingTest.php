@@ -44,6 +44,7 @@ class GooglePlayBillingTest extends TestCase
         $user->refresh();
         $this->assertEquals('lifetime', $user->plan_type);
         $this->assertNull($user->plan_expires_at);
+        $this->assertEquals(500, $user->ai_quota_left);
         $this->assertTrue($user->isPro());
 
         $this->assertDatabaseHas('subscriptions', [
@@ -86,6 +87,7 @@ class GooglePlayBillingTest extends TestCase
         $this->assertEquals('pro', $user->plan_type);
         $this->assertNotNull($user->plan_expires_at);
         $this->assertTrue($user->plan_expires_at->isFuture());
+        $this->assertEquals(500, $user->ai_quota_left);
         $this->assertTrue($user->isPro());
     }
 

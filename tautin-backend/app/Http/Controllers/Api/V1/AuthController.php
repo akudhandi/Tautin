@@ -23,10 +23,16 @@ class AuthController extends Controller
     {
         $result = $action->execute($request->validated());
 
+        $collections = $result['user']->collections()
+            ->withCount('links')
+            ->orderBy('sort_order', 'asc')
+            ->get();
+
         return $this->successResponse(
             data: [
                 'user' => $result['user'],
                 'token' => $result['token'],
+                'collections' => $collections,
                 'is_new_user' => $result['is_new_user'],
             ],
             message: $result['is_new_user'] ? 'Pendaftaran berhasil.' : 'Login berhasil.',

@@ -177,7 +177,14 @@ class SchedulerCommandsTest extends TestCase
             'name' => 'Wawan Pro',
             'email' => 'wawan@example.com',
             'plan_type' => 'pro',
-            'ai_quota_left' => 999,
+            'ai_quota_left' => 120,
+        ]);
+
+        $lifetimeUser = User::create([
+            'name' => 'Luki Lifetime',
+            'email' => 'luki@example.com',
+            'plan_type' => 'lifetime',
+            'ai_quota_left' => 15,
         ]);
 
         $this->artisan('tautin:reset-monthly-quota')
@@ -186,9 +193,11 @@ class SchedulerCommandsTest extends TestCase
         $freeUser1->refresh();
         $freeUser2->refresh();
         $proUser->refresh();
+        $lifetimeUser->refresh();
 
         $this->assertEquals(10, $freeUser1->ai_quota_left);
         $this->assertEquals(10, $freeUser2->ai_quota_left);
-        $this->assertEquals(999, $proUser->ai_quota_left);
+        $this->assertEquals(500, $proUser->ai_quota_left);
+        $this->assertEquals(500, $lifetimeUser->ai_quota_left);
     }
 }

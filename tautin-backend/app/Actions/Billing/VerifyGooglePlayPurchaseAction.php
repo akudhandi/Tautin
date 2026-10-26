@@ -72,15 +72,19 @@ class VerifyGooglePlayPurchaseAction
                 ]
             );
 
+            $fairUseQuota = (int) config('tautin.pro_plan.fair_use_monthly_ai_quota', 500);
+
             if ($verified['is_lifetime']) {
                 $user->update([
                     'plan_type' => 'lifetime',
                     'plan_expires_at' => null,
+                    'ai_quota_left' => $fairUseQuota,
                 ]);
             } else {
                 $user->update([
                     'plan_type' => 'pro',
                     'plan_expires_at' => $verified['expires_at'],
+                    'ai_quota_left' => $fairUseQuota,
                 ]);
             }
 

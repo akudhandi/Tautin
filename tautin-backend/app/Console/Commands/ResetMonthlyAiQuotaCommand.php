@@ -19,19 +19,23 @@ class ResetMonthlyAiQuotaCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Reset sisa kuota AI bulanan menjadi 10 untuk seluruh pengguna gratis';
+    protected $description = 'Reset sisa kuota AI bulanan untuk seluruh pengguna gratis dan pro/lifetime';
 
     /**
      * Execute the console command.
      */
     public function handle(): int
     {
-        $defaultQuota = (int) config('tautin.free_plan.monthly_ai_quota', 10);
+        $freeQuota = (int) config('tautin.free_plan.monthly_ai_quota', 10);
+        $proQuota = (int) config('tautin.pro_plan.fair_use_monthly_ai_quota', 500);
 
-        $affected = User::where('plan_type', 'free')
-            ->update(['ai_quota_left' => $defaultQuota]);
+        $affectedFree = User::where('plan_type', 'free')
+            ->update(['ai_quota_left' => $freeQuota]);
 
-        $this->info("Berhasil mereset kuota AI untuk {$affected} pengguna gratis ke {$defaultQuota}.");
+        $affectedPro = User::whereIn('plan_type', ['pro', 'lifetime'])
+            ->update(['ai_quota_left' => $proQuota]);
+
+        $this->info("Berhasil mereset kuota AI: {$affectedFree} pengguna gratis ({$freeQuota}), {$affectedPro} pengguna pro/lifetime ({$proQuota}).");
 
         return self::SUCCESS;
     }

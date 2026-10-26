@@ -33,7 +33,8 @@ class AuthTest extends TestCase
                     'ai_quota_left' => 10,
                     'plan_type' => 'free',
                 ],
-            ]);
+            ])
+            ->assertJsonCount(5, 'data.collections');
 
         $this->assertDatabaseHas('users', [
             'email' => 'budi@example.com',

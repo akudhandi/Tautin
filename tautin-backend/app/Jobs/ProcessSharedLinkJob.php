@@ -10,6 +10,7 @@ use App\Services\Scraper\MultiLayerScraperService;
 use App\Services\Scraper\SsrfGuard;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -95,7 +96,8 @@ class ProcessSharedLinkJob implements ShouldQueue
 
         // 3. AI Analysis & Auto-Organization
         $user = $link->user;
-        $aiEligible = $user && ($user->isPro() || $user->ai_quota_left > 0);
+        $aiEligible = $user && $user->hasAiQuota();
+        $aiApplied = false;
 
         if ($aiEligible) {
             $aiResult = $gemini->analyze($link, $user, $metadata);
@@ -105,12 +107,15 @@ class ProcessSharedLinkJob implements ShouldQueue
                 $link->ai_summary = $aiResult->summary;
                 $link->source_type = $aiResult->sourceType;
                 $link->is_ai_processed = true;
+                $aiApplied = true;
 
-                // Auto-Folder Mapping if not selected manually
+                // Auto-Folder Mapping if not selected manually (case-insensitive)
                 if ($link->collection_id === null) {
-                    $matched = $user->collections()
-                        ->where('name', $aiResult->selectedCollectionName)
-                        ->first();
+                    $targetName = mb_strtolower(trim($aiResult->selectedCollectionName));
+                    $matched = $user->collections->first(function ($col) use ($targetName) {
+                        return mb_strtolower(trim($col->name)) === $targetName;
+                    });
+
                     if ($matched) {
                         $link->collection_id = $matched->id;
                     }
@@ -128,11 +133,6 @@ class ProcessSharedLinkJob implements ShouldQueue
                     }
                     $link->tags()->sync($tagIds);
                 }
-
-                // Decrement Quota for Free Tier
-                if ($user->plan_type === 'free') {
-                    $user->decrement('ai_quota_left');
-                }
             }
         }
 
@@ -148,6 +148,31 @@ class ProcessSharedLinkJob implements ShouldQueue
         }
 
         $link->status = 'completed';
-        $link->save();
+
+        try {
+            $link->save();
+        } catch (QueryException $e) {
+            $existing = Link::where('user_id', $link->user_id)
+                ->where('url_hash', $link->url_hash)
+                ->where('id', '!=', $link->id)
+                ->first();
+
+            if ($existing) {
+                $existing->touch();
+                if (! empty($link->user_notes) && empty($existing->user_notes)) {
+                    $existing->update(['user_notes' => $link->user_notes]);
+                }
+                $link->delete();
+
+                return;
+            }
+
+            throw $e;
+        }
+
+        // Decrement quota AFTER successful save
+        if ($aiApplied && $user) {
+            $user->decrement('ai_quota_left');
+        }
     }
 }

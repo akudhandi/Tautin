@@ -83,7 +83,7 @@ class LinkController extends Controller
         $query->orderBy('is_pinned', 'desc')
             ->orderBy('updated_at', 'desc');
 
-        $perPage = $request->integer('per_page', 20);
+        $perPage = min(max($request->integer('per_page', 20), 1), 100);
         $links = $query->with(['collection', 'tags'])->paginate($perPage);
 
         return $this->successResponse(

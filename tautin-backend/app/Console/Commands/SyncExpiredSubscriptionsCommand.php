@@ -41,13 +41,16 @@ class SyncExpiredSubscriptionsCommand extends Command
         $downgraded = 0;
         $renewed = 0;
 
+        $freeQuota = (int) config('tautin.free_plan.monthly_ai_quota', 10);
+        $proQuota = (int) config('tautin.pro_plan.fair_use_monthly_ai_quota', 500);
+
         foreach ($expiredUsers as $user) {
             $lastSub = $user->subscriptions->first();
 
             if (! $lastSub) {
                 $user->update([
                     'plan_type' => 'free',
-                    'ai_quota_left' => 10,
+                    'ai_quota_left' => $freeQuota,
                 ]);
                 $downgraded++;
 
@@ -64,6 +67,7 @@ class SyncExpiredSubscriptionsCommand extends Command
                     // Subscription auto-renewed by user in Google Play
                     $user->update([
                         'plan_expires_at' => $verified['expires_at'],
+                        'ai_quota_left' => $proQuota,
                     ]);
 
                     $lastSub->update([
@@ -82,7 +86,7 @@ class SyncExpiredSubscriptionsCommand extends Command
 
                     $user->update([
                         'plan_type' => 'free',
-                        'ai_quota_left' => 10,
+                        'ai_quota_left' => $freeQuota,
                     ]);
 
                     $downgraded++;
@@ -100,7 +104,7 @@ class SyncExpiredSubscriptionsCommand extends Command
 
                 $user->update([
                     'plan_type' => 'free',
-                    'ai_quota_left' => 10,
+                    'ai_quota_left' => $freeQuota,
                 ]);
 
                 $downgraded++;
