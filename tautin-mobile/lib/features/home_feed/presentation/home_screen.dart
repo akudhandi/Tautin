@@ -340,11 +340,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     Text(
                       'Belum Dibaca Minggu Ini',
                       style: TautinTheme.jakartaHeading(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
                         color: isDark
                             ? TautinColors.textPrimaryDark
                             : TautinColors.brandTeal,
+                        letterSpacing: -0.02,
                       ),
                     ),
                     InkWell(
@@ -356,12 +357,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Text(
                         'Lihat semua',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                           color: isDark
-                              ? TautinColors.mintAccent
-                              : TautinColors.seamTeal,
-                          decoration: TextDecoration.underline,
+                              ? TautinColors.textSecondaryDark
+                              : TautinColors.brandTeal,
                         ),
                       ),
                     ),
@@ -549,13 +549,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     int index,
     bool isDark,
   ) {
-    // Alternating palette: Ice Blue, Mint, Card White
-    final List<Color> colors = <Color>[
+    final List<Color> lightColors = <Color>[
       TautinColors.iceBlue,
       TautinColors.mintAccent,
-      isDark ? TautinColors.darkCard : Colors.white,
+      Colors.white,
     ];
-    final Color bgColor = colors[index % colors.length];
+    final Color bgColor =
+        isDark ? TautinColors.darkCard : lightColors[index % lightColors.length];
+
+    final Color primaryText =
+        isDark ? TautinColors.textPrimaryDark : TautinColors.brandTeal;
+    final Color secondaryText =
+        isDark ? TautinColors.textSecondaryDark : TautinColors.brandTeal;
+
+    final Color pillBg = isDark
+        ? TautinColors.mossAltDark
+        : (bgColor == Colors.white
+            ? TautinColors.creamBackground
+            : Colors.white.withValues(alpha: 0.65));
+
+    final Color pillText =
+        isDark ? TautinColors.textSecondaryDark : TautinColors.brandTeal;
 
     return InkWell(
       onTap: () {
@@ -563,12 +577,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        width: 228,
-        height: 140,
+        width: 224,
+        height: 132,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(24),
+          border: isDark
+              ? Border.all(color: TautinColors.darkBorder)
+              : (bgColor == Colors.white
+                  ? Border.all(color: TautinColors.softBorder)
+                  : null),
         ),
         child: Stack(
           children: <Widget>[
@@ -577,22 +596,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: pillBg,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     formatRelativeTime(link.updatedAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: TautinColors.brandTeal,
+                      color: pillText,
                     ),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(right: 44),
+                  padding: const EdgeInsets.only(right: 36),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -602,20 +622,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             : link.url,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Plus Jakarta Sans',
                           fontWeight: FontWeight.w700,
-                          fontSize: 14.5,
+                          fontSize: 15,
                           height: 1.25,
-                          color: TautinColors.brandTeal,
+                          color: primaryText,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         link.domain,
-                        style: const TextStyle(
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
                           fontSize: 12.5,
-                          color: TautinColors.brandTeal,
+                          color: secondaryText,
                         ),
                       ),
                     ],
@@ -627,15 +649,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               right: 0,
               bottom: 0,
               child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: TautinColors.brandTeal,
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isDark ? TautinColors.mossDark : TautinColors.brandTeal,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.arrow_outward_rounded,
-                  size: 18,
+                  size: 16,
                   color: TautinColors.mintAccent,
                 ),
               ),
@@ -647,188 +669,160 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildFloatingDock(BuildContext context, MainTab currentTab) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color dockBg =
+        isDark ? TautinColors.darkCard : TautinColors.brandTeal;
+    final Color iconInactive =
+        isDark ? TautinColors.textSecondaryDark : TautinColors.creamBackground;
+    final Color iconActive =
+        isDark ? TautinColors.mintAccent : TautinColors.creamBackground;
+    final Color activeBg = isDark
+        ? TautinColors.mintAccent.withValues(alpha: 0.16)
+        : TautinColors.creamBackground.withValues(alpha: 0.18);
+
     return Positioned(
-      left: 16,
-      right: 16,
+      left: 0,
+      right: 0,
       bottom: 24,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: <Widget>[
-          // Pill Bar
-          Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: TautinColors.brandTeal,
-              borderRadius: BorderRadius.circular(32),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: TautinColors.brandTeal.withValues(alpha: 0.35),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                // Left 2 items: Home & Collections
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    _dockButton(
-                      activeIcon: Icons.home_rounded,
-                      inactiveIcon: Icons.home_outlined,
-                      label: 'Beranda',
-                      isActive: currentTab == MainTab.home,
-                      onTap: () {
-                        ref.read(activeTabProvider.notifier).setTab(
-                              MainTab.home,
-                            );
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    _dockButton(
-                      activeIcon: Icons.folder_rounded,
-                      inactiveIcon: Icons.folder_outlined,
-                      label: 'Koleksi',
-                      isActive: currentTab == MainTab.collections,
-                      onTap: () {
-                        ref.read(activeTabProvider.notifier).setTab(
-                              MainTab.collections,
-                            );
-                      },
-                    ),
-                  ],
-                ),
-
-                // Right 2 items: Settings & Paywall Pro
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    _dockButton(
-                      activeIcon: Icons.person_rounded,
-                      inactiveIcon: Icons.person_outline_rounded,
-                      label: 'Profil',
-                      isActive: currentTab == MainTab.settings,
-                      onTap: () {
-                        ref.read(activeTabProvider.notifier).setTab(
-                              MainTab.settings,
-                            );
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    _dockButton(
-                      activeIcon: Icons.workspace_premium_rounded,
-                      inactiveIcon: Icons.workspace_premium_outlined,
-                      label: 'Pro',
-                      isActive: false,
-                      isPro: true,
-                      onTap: () {
-                        context.push(AppRoutes.paywall);
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Center Raised Add (+) Button
-          Positioned(
-            top: -22,
-            child: Tooltip(
-              message: 'Tempel Tautan Baru (+)',
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  _openQuickAdd();
-                },
-                child: Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: TautinColors.mintAccent,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: TautinColors.creamBackground,
-                      width: 5,
-                    ),
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: TautinColors.brandTeal.withValues(alpha: 0.28),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: TautinColors.brandTeal,
-                    size: 32,
-                  ),
-                ),
+      child: Center(
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: dockBg,
+            borderRadius: BorderRadius.circular(32),
+            border: isDark ? Border.all(color: TautinColors.darkBorder) : null,
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.4)
+                    : TautinColors.brandTeal.withValues(alpha: 0.25),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
-            ),
+            ],
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              // 1. Beranda
+              _dockIconButton(
+                icon: Icons.home_rounded,
+                tooltip: 'Beranda',
+                isActive: currentTab == MainTab.home,
+                activeBg: activeBg,
+                iconColor:
+                    currentTab == MainTab.home ? iconActive : iconInactive,
+                onTap: () =>
+                    ref.read(activeTabProvider.notifier).setTab(MainTab.home),
+              ),
+              const SizedBox(width: 6),
+
+              // 2. Koleksi
+              _dockIconButton(
+                icon: Icons.folder_rounded,
+                tooltip: 'Koleksi',
+                isActive: currentTab == MainTab.collections,
+                activeBg: activeBg,
+                iconColor: currentTab == MainTab.collections
+                    ? iconActive
+                    : iconInactive,
+                onTap: () => ref
+                    .read(activeTabProvider.notifier)
+                    .setTab(MainTab.collections),
+              ),
+              const SizedBox(width: 6),
+
+              // 3. Center FAB (Simpan tautan baru)
+              _fabButton(),
+              const SizedBox(width: 6),
+
+              // 4. Profil
+              _dockIconButton(
+                icon: Icons.person_rounded,
+                tooltip: 'Profil',
+                isActive: currentTab == MainTab.settings,
+                activeBg: activeBg,
+                iconColor: currentTab == MainTab.settings
+                    ? iconActive
+                    : iconInactive,
+                onTap: () => ref
+                    .read(activeTabProvider.notifier)
+                    .setTab(MainTab.settings),
+              ),
+              const SizedBox(width: 6),
+
+              // 5. Tautin Pro
+              _dockIconButton(
+                icon: Icons.auto_awesome,
+                tooltip: 'Tautin Pro',
+                isActive: false,
+                activeBg: activeBg,
+                iconColor: TautinColors.mintAccent,
+                onTap: () => context.push(AppRoutes.paywall),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _dockButton({
-    required IconData activeIcon,
-    required IconData inactiveIcon,
-    required String label,
+  Widget _fabButton() {
+    return Tooltip(
+      message: 'Simpan tautan baru',
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          _openQuickAdd();
+        },
+        borderRadius: BorderRadius.circular(26),
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: const BoxDecoration(
+            color: TautinColors.mintAccent,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.add_rounded,
+            color: TautinColors.brandTeal,
+            size: 26,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dockIconButton({
+    required IconData icon,
+    required String tooltip,
     required bool isActive,
+    required Color activeBg,
+    required Color iconColor,
     required VoidCallback onTap,
-    bool isPro = false,
   }) {
     return Tooltip(
-      message: label,
+      message: tooltip,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
           onTap();
         },
         borderRadius: BorderRadius.circular(24),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: EdgeInsets.symmetric(
-            horizontal: isActive ? 12 : 8,
-            vertical: 8,
-          ),
+        child: Container(
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: isActive ? TautinColors.mintAccent : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
+            color: isActive ? activeBg : Colors.transparent,
+            shape: BoxShape.circle,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                isActive ? activeIcon : inactiveIcon,
-                size: 22,
-                color: isActive
-                    ? TautinColors.brandTeal
-                    : (isPro
-                        ? TautinColors.mintAccent
-                        : TautinColors.creamBackground.withValues(alpha: 0.8)),
-              ),
-              if (isActive) ...<Widget>[
-                const SizedBox(width: 5),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                    color: TautinColors.brandTeal,
-                  ),
-                ),
-              ],
-            ],
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 22,
+            color: iconColor,
           ),
         ),
       ),
