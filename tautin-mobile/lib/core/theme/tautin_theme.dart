@@ -28,13 +28,16 @@ abstract final class TautinColors {
   static const Color aiSummaryBoxLight = Color(0xFFFFFFFF);
   static const Color aiSummaryBorderLight = mistTeal;
 
-  // Dark mode (Night Spruce)
+  // Dark mode (Night Spruce) — values taken from the `.dk*` dark screens:
+  // background `#16323D`, card `#1E3B47`, hairline border `#2E5563`,
+  // secondary text `#A9C6D0`.
   static const Color darkBackground = darkTeal;
-  static const Color darkCard = Color(0xFF1E3A45);
+  static const Color darkCard = Color(0xFF1E3B47);
+  static const Color darkBorder = Color(0xFF2E5563);
   static const Color textPrimaryDark = creamBackground;
-  static const Color textSecondaryDark = mistTeal;
-  static const Color aiSummaryBoxDark = Color(0xFF1A333C);
-  static const Color aiSummaryBorderDark = Color(0xFF2E5360);
+  static const Color textSecondaryDark = Color(0xFFA9C6D0);
+  static const Color aiSummaryBoxDark = darkTeal;
+  static const Color aiSummaryBorderDark = darkBorder;
 
   // Semantic
   static const Color successGreen = Color(0xFF10B981);
