@@ -122,13 +122,26 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       backgroundColor: TautinColors.brandTeal,
       body: Stack(
         children: <Widget>[
-          // Background Flower Watermark
+          // Background Flower Watermark (top-right, full #CAFFA6, no letter)
           const Positioned(
             right: -60,
             top: -30,
-            child: Opacity(
-              opacity: 0.18,
-              child: TautinLogoIcon(size: 240),
+            child: TautinLogoIcon(size: 240, showLetter: false),
+          ),
+
+          // Left decorative ice-blue circle
+          const Positioned(
+            left: -40,
+            top: 96,
+            child: SizedBox(
+              width: 110,
+              height: 110,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: TautinColors.iceBlue,
+                  shape: BoxShape.circle,
+                ),
+              ),
             ),
           ),
 
@@ -164,7 +177,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  height: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: TautinColors.mintAccent,
                     borderRadius: BorderRadius.circular(14),
@@ -187,22 +201,28 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Rapikan semua tautanmu,',
-                  style: TautinTheme.jakartaHeading(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: TautinColors.creamBackground,
-                    letterSpacing: -0.03,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Rapikan semua tautanmu,',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TautinTheme.jakartaHeading(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: TautinColors.creamBackground,
+                      letterSpacing: -0.03,
+                    ).copyWith(height: 1.05),
                   ),
                 ),
                 Text(
                   'tanpa batas.',
                   style: TautinTheme.editorialSerif(
-                    fontSize: 40,
+                    fontSize: 42,
                     fontWeight: FontWeight.w400,
                     color: TautinColors.mintAccent,
-                  ),
+                  ).copyWith(letterSpacing: -0.01),
                 ),
               ],
             ),
@@ -212,7 +232,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
           Positioned(
             left: 0,
             right: 0,
-            top: 270,
+            top: 272,
             bottom: 0,
             child: Container(
               padding: const EdgeInsets.only(left: 20, right: 20, top: 22),
@@ -247,7 +267,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       icon: Icons.public_rounded,
                       text: 'Bagikan koleksi publik tanpa batas',
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 22),
 
                     // Plans
                     _buildPlanCard(
@@ -257,7 +277,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       price: 'Rp29.000',
                       period: 'per bulan',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _buildPlanCard(
                       plan: ProPlan.yearly,
                       title: 'Tahunan',
@@ -266,7 +286,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       period: 'per tahun',
                       badge: 'Paling Hemat',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _buildPlanCard(
                       plan: ProPlan.lifetime,
                       title: 'Selamanya',
@@ -278,64 +298,74 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     const SizedBox(height: 18),
 
                     // CTA Button
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: TautinColors.brandTeal,
-                        foregroundColor: TautinColors.creamBackground,
-                        minimumSize: const Size.fromHeight(56),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
+                    SizedBox(
+                      height: 58,
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: TautinColors.brandTeal,
+                          foregroundColor: TautinColors.creamBackground,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(29),
+                          ),
                         ),
+                        onPressed: _isLoading ? null : _subscribe,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: TautinColors.mintAccent,
+                                ),
+                              )
+                            : const Text(
+                                'Mulai Tautin Pro',
+                                style: TextStyle(
+                                  fontFamily: 'Plus Jakarta Sans',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
                       ),
-                      onPressed: _isLoading ? null : _subscribe,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TautinColors.mintAccent,
-                              ),
-                            )
-                          : const Text(
-                              'Mulai Tautin Pro',
-                              style: TextStyle(
-                                fontFamily: 'Plus Jakarta Sans',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
                     // Restore Purchases
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: <Widget>[
-                        TextButton(
-                          onPressed: _isLoading ? null : _restore,
-                          child: const Text(
-                            'Pulihkan Pembelian',
-                            style: TextStyle(
-                              decoration: TextDecoration.underline,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              color: TautinColors.brandTeal,
+                    SizedBox(
+                      height: 40,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: <Widget>[
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                            ),
+                            onPressed: _isLoading ? null : _restore,
+                            child: const Text(
+                              'Pulihkan Pembelian',
+                              style: TextStyle(
+                                decoration: TextDecoration.underline,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13.5,
+                                color: TautinColors.brandTeal,
+                              ),
                             ),
                           ),
-                        ),
-                        const Text(' · ', style: TextStyle(color: TautinColors.seamTeal)),
-                        const Text(
-                          'Batalkan kapan saja di Google Play',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: TautinColors.seamTeal,
+                          const Text(' · ', style: TextStyle(color: TautinColors.seamTeal, fontSize: 13)),
+                          const Text(
+                            'Batalkan kapan saja di Google Play',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: TautinColors.seamTeal,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -394,8 +424,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
         clipBehavior: Clip.none,
         children: <Widget>[
           Container(
-            constraints: const BoxConstraints(minHeight: 68),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            height: 66,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: isSelected ? TautinColors.mintAccent : Colors.white,
               borderRadius: BorderRadius.circular(22),
@@ -406,7 +436,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
             ),
             child: Row(
               children: <Widget>[
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
                   width: 22,
                   height: 22,
                   decoration: BoxDecoration(
@@ -415,11 +446,13 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       color: TautinColors.brandTeal,
                       width: 2,
                     ),
-                    color: isSelected ? TautinColors.brandTeal : Colors.transparent,
+                    color:
+                        isSelected ? TautinColors.brandTeal : Colors.transparent,
                   ),
+                  alignment: Alignment.center,
                   child: isSelected
                       ? const Icon(
-                          Icons.check,
+                          Icons.check_rounded,
                           size: 13,
                           color: TautinColors.mintAccent,
                         )
@@ -433,6 +466,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     children: <Widget>[
                       Text(
                         title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontFamily: 'Plus Jakarta Sans',
                           fontWeight: FontWeight.w700,
@@ -442,9 +477,13 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       ),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: TautinColors.seamTeal,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: isSelected
+                              ? TautinColors.brandTeal
+                              : TautinColors.seamTeal,
                         ),
                       ),
                     ],
@@ -465,9 +504,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     ),
                     Text(
                       period,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: TautinColors.seamTeal,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSelected
+                            ? TautinColors.brandTeal
+                            : TautinColors.seamTeal,
                       ),
                     ),
                   ],
@@ -478,15 +519,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
           if (badge != null)
             Positioned(
               right: 16,
-              top: -10,
+              top: -11,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                height: 22,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
                   color: badge == 'Paling Hemat'
                       ? TautinColors.brandTeal
                       : TautinColors.iceBlue,
                   borderRadius: BorderRadius.circular(11),
                 ),
+                alignment: Alignment.center,
                 child: Text(
                   badge,
                   style: TextStyle(
@@ -495,7 +538,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                         : TautinColors.brandTeal,
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w800,
-                    fontSize: 10.5,
+                    fontSize: 11,
                   ),
                 ),
               ),

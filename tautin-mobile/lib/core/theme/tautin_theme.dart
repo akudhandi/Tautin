@@ -336,10 +336,12 @@ class TautinFlowerPainter extends CustomPainter {
   const TautinFlowerPainter({
     this.fillColor = TautinColors.mintAccent,
     this.letterColor = TautinColors.brandTeal,
+    this.showLetter = true,
   });
 
   final Color fillColor;
   final Color letterColor;
+  final bool showLetter;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -370,6 +372,11 @@ class TautinFlowerPainter extends CustomPainter {
       canvas.drawCircle(pt, 17, paint);
     }
 
+    if (!showLetter) {
+      canvas.restore();
+      return;
+    }
+
     // Letter 't'
     final TextPainter tp = TextPainter(
       text: TextSpan(
@@ -392,7 +399,8 @@ class TautinFlowerPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant TautinFlowerPainter oldDelegate) =>
       oldDelegate.fillColor != fillColor ||
-      oldDelegate.letterColor != letterColor;
+      oldDelegate.letterColor != letterColor ||
+      oldDelegate.showLetter != showLetter;
 }
 
 /// Reusable brand logo icon widget.
@@ -402,11 +410,13 @@ class TautinLogoIcon extends StatelessWidget {
     this.size = 36,
     this.petalColor = TautinColors.mintAccent,
     this.letterColor = TautinColors.brandTeal,
+    this.showLetter = true,
   });
 
   final double size;
   final Color petalColor;
   final Color letterColor;
+  final bool showLetter;
 
   @override
   Widget build(BuildContext context) {
@@ -417,6 +427,7 @@ class TautinLogoIcon extends StatelessWidget {
         painter: TautinFlowerPainter(
           fillColor: petalColor,
           letterColor: letterColor,
+          showLetter: showLetter,
         ),
       ),
     );
