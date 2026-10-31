@@ -28,4 +28,54 @@ return [
         'model' => 'gemini-2.5-flash',
         'api_key' => env('GEMINI_API_KEY'),
     ],
+    'gamification' => [
+        // Every streak/mission period is computed in WIB (PRD FR-GAME-03).
+        'timezone' => 'Asia/Jakarta',
+        // XP awarded per action. The client never computes XP (PRD FR-GAME-01).
+        'xp' => [
+            'save' => 10,
+            'read' => 5,
+            'pin' => 3,
+            'mission' => 20,
+        ],
+        // A user levels up every `level_step` XP: level = floor(xp / step) + 1.
+        'level_step' => 100,
+        // Title per level (PRD FR-GAME-02); levels past the end keep the last title.
+        'titles' => [
+            1 => 'Pemula Tautan',
+            2 => 'Penyimpan Rajin',
+            3 => 'Pemungut Tautan',
+            4 => 'Kurator Cilik',
+            5 => 'Master Tautan',
+        ],
+        // Streak shield: how many missed days may be forgiven per calendar week.
+        'streak_shields_per_week' => [
+            'free' => 1,
+            'pro' => 3,
+        ],
+        // Daily/weekly missions shown on Beranda & Profil.
+        'missions' => [
+            [
+                'key' => 'daily_save_3',
+                'period_type' => 'daily',
+                'target' => 3,
+                'label' => 'Simpan 3 tautan',
+                'track' => 'save',
+            ],
+            [
+                'key' => 'daily_read_1',
+                'period_type' => 'daily',
+                'target' => 1,
+                'label' => 'Baca 1 tautan',
+                'track' => 'read',
+            ],
+            [
+                'key' => 'weekly_curate_10',
+                'period_type' => 'weekly',
+                'target' => 10,
+                'label' => 'Simpan 10 tautan minggu ini',
+                'track' => 'save',
+            ],
+        ],
+    ],
 ];

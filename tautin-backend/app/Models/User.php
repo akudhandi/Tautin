@@ -27,6 +27,11 @@ class User extends Authenticatable
         'plan_type',
         'plan_expires_at',
         'ai_quota_left',
+        'xp',
+        'level',
+        'streak_days',
+        'streak_last_date',
+        'streak_shields_used',
         'fcm_token',
     ];
 
@@ -49,7 +54,32 @@ class User extends Authenticatable
         return [
             'plan_expires_at' => 'datetime',
             'ai_quota_left' => 'integer',
+            'xp' => 'integer',
+            'level' => 'integer',
+            'streak_days' => 'integer',
+            'streak_last_date' => 'date',
+            'streak_shields_used' => 'integer',
         ];
+    }
+
+    /**
+     * Map the current level to its editorial title (PRD FR-GAME-02).
+     */
+    public function levelTitle(): string
+    {
+        /** @var array<int, string> $titles */
+        $titles = config('tautin.gamification.titles', []);
+        ksort($titles);
+
+        $title = reset($titles) ?: 'Pemula Tautan';
+
+        foreach ($titles as $level => $label) {
+            if ($this->level >= $level) {
+                $title = $label;
+            }
+        }
+
+        return $title;
     }
 
     /**
@@ -106,5 +136,13 @@ class User extends Authenticatable
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * Get the user's gamification mission progress rows.
+     */
+    public function missions(): HasMany
+    {
+        return $this->hasMany(UserMission::class);
     }
 }

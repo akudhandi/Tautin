@@ -5,10 +5,13 @@ namespace App\Actions\Links;
 use App\Jobs\ProcessSharedLinkJob;
 use App\Models\Link;
 use App\Models\User;
+use App\Services\Gamification\XpLevelService;
 use App\Services\Scraper\SsrfGuard;
 
 class QuickSaveLinkAction
 {
+    public function __construct(private readonly XpLevelService $xpLevelService) {}
+
     /**
      * Quickly save a link in < 300ms, handle duplicate detection, and dispatch background worker.
      *
@@ -64,6 +67,10 @@ class QuickSaveLinkAction
         ]);
 
         ProcessSharedLinkJob::dispatch($link->id)->onQueue('high');
+
+        // Server-side gamification: a brand-new link is the only save that
+        // grants XP, so duplicates short-circuit above (PRD FR-GAME-01 AC-3).
+        $this->xpLevelService->awardSave($user);
 
         return [
             'link' => $link->load('collection', 'tags'),

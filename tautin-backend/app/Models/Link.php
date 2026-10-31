@@ -33,6 +33,8 @@ class Link extends Model
         'is_ai_processed',
         'is_pinned',
         'is_read',
+        'read_xp_awarded',
+        'pin_xp_awarded',
         'remind_at',
         'reminder_sent',
     ];
@@ -48,6 +50,8 @@ class Link extends Model
             'is_ai_processed' => 'boolean',
             'is_pinned' => 'boolean',
             'is_read' => 'boolean',
+            'read_xp_awarded' => 'boolean',
+            'pin_xp_awarded' => 'boolean',
             'reminder_sent' => 'boolean',
             'remind_at' => 'datetime',
         ];

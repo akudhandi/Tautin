@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BillingController;
 use App\Http\Controllers\Api\V1\CollectionController;
+use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GooglePlayRtdnController;
 use App\Http\Controllers\Api\V1\LinkController;
 use App\Http\Controllers\Api\V1\PublicCollectionController;
@@ -41,5 +42,8 @@ Route::prefix('v1')->group(function (): void {
         // Google Play Billing
         Route::post('/billing/verify-purchase', [BillingController::class, 'verifyPurchase']);
         Route::post('/billing/restore', [BillingController::class, 'restore']);
+
+        // Gamification (XP, level, streak, missions)
+        Route::get('/gamification/summary', [GamificationController::class, 'summary']);
     });
 });

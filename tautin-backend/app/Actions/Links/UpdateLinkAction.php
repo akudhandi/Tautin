@@ -5,9 +5,12 @@ namespace App\Actions\Links;
 use App\Exceptions\BusinessLogicException;
 use App\Models\Link;
 use App\Models\User;
+use App\Services\Gamification\XpLevelService;
 
 class UpdateLinkAction
 {
+    public function __construct(private readonly XpLevelService $xpLevelService) {}
+
     /**
      * Update link properties respecting Pro tier boundaries.
      *
@@ -42,7 +45,30 @@ class UpdateLinkAction
             }
         }
 
+        // Capture the pre-update state so XP is granted once per link only
+        // (PRD FR-GAME-01 AC-3).
+        $readXpAwarded = (bool) $link->read_xp_awarded;
+        $pinXpAwarded = (bool) $link->pin_xp_awarded;
+
         $link->update($data);
+
+        $becameRead = array_key_exists('is_read', $data)
+            && (bool) $data['is_read'] === true
+            && ! $readXpAwarded;
+
+        $becamePinned = array_key_exists('is_pinned', $data)
+            && (bool) $data['is_pinned'] === true
+            && ! $pinXpAwarded;
+
+        if ($becameRead) {
+            $link->forceFill(['read_xp_awarded' => true])->save();
+            $this->xpLevelService->awardRead($user);
+        }
+
+        if ($becamePinned) {
+            $link->forceFill(['pin_xp_awarded' => true])->save();
+            $this->xpLevelService->awardPin($user);
+        }
 
         return $link->fresh(['collection', 'tags']);
     }
