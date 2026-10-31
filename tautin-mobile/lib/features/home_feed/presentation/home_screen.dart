@@ -9,6 +9,10 @@ import '../../../core/theme/tautin_theme.dart';
 import '../../../shared/models/link_model.dart';
 import '../../../shared/widgets/smart_link_card.dart';
 import '../../collections/presentation/collections_screen.dart';
+import '../../gamification/domain/gamification_summary.dart';
+import '../../gamification/presentation/widgets/missions_modal_sheet.dart';
+import '../../gamification/presentation/widgets/tauti_mascot_card.dart';
+import '../../gamification/providers/gamification_providers.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../share_intent/domain/dirty_url_parser.dart';
 import '../../share_intent/presentation/quick_taut_bottom_sheet.dart';
@@ -186,111 +190,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onRefresh: () async {
         ref.invalidate(feedProvider);
         ref.invalidate(resurfaceLinksProvider);
+        ref.invalidate(gamificationSummaryProvider);
         await ref.read(currentUserProvider.notifier).refresh();
       },
       child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
-          // Background Watermark + App Bar
-          SliverToBoxAdapter(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: <Widget>[
-                Positioned(
-                  right: -56,
-                  top: 92,
-                  child: Opacity(
-                    opacity: isDark ? 0.08 : 0.45,
-                    child: const TautinLogoIcon(size: 180),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    top: 54,
-                    bottom: 8,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      // Wordmark Header
-                      const TautinBrandHeader(iconSize: 36, fontSize: 22),
-
-                      // Profile shortcut button
-                      Tooltip(
-                        message: 'Profil & Pengaturan',
-                        child: InkWell(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            ref
-                                .read(activeTabProvider.notifier)
-                                .setTab(MainTab.settings);
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: isDark ? TautinColors.darkCard : Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: <BoxShadow>[
-                                BoxShadow(
-                                  color: TautinColors.brandTeal
-                                      .withValues(alpha: 0.08),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.person_rounded,
-                              size: 20,
-                              color: isDark
-                                  ? TautinColors.mintAccent
-                                  : TautinColors.brandTeal,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Editorial Slogan
+          // App Bar
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 54,
+                bottom: 8,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
-                  Text(
-                    'Temukan di mana saja,',
-                    style: TautinTheme.jakartaHeading(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: isDark
-                          ? TautinColors.textPrimaryDark
-                          : TautinColors.brandTeal,
-                      letterSpacing: -0.025,
-                    ),
-                  ),
-                  Text(
-                    'Tautin di sini.',
-                    style: TautinTheme.editorialSerif(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w400,
-                      color: isDark
-                          ? TautinColors.mintAccent
-                          : TautinColors.brandTeal,
+                  // Wordmark Header
+                  const TautinBrandHeader(iconSize: 36, fontSize: 22),
+
+                  // Profile shortcut button
+                  Tooltip(
+                    message: 'Profil & Pengaturan',
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        ref
+                            .read(activeTabProvider.notifier)
+                            .setTab(MainTab.settings);
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark ? TautinColors.darkCard : Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: TautinColors.brandTeal
+                                  .withValues(alpha: 0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.person_rounded,
+                          size: 20,
+                          color: isDark
+                              ? TautinColors.mintAccent
+                              : TautinColors.brandTeal,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+
+          // Tauti Mascot Card (.mcard: level pill, title, bubble, XP bar, Misi chip)
+          SliverToBoxAdapter(
+            child: Consumer(
+              builder: (BuildContext ctx, WidgetRef ref, _) {
+                final GamificationSummary summary = ref
+                    .watch(gamificationSummaryProvider)
+                    .value ??
+                    GamificationSummary.initial();
+
+                return TautiMascotCard(
+                  summary: summary,
+                  onMisiTap: () => MissionsModalSheet.show(
+                    ctx,
+                    summary: summary,
+                  ),
+                );
+              },
             ),
           ),
 
