@@ -8,12 +8,14 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/tautin_theme.dart';
 import '../../../shared/models/link_model.dart';
 import '../../../shared/widgets/smart_link_card.dart';
+import '../../../shared/widgets/tauti_mascot.dart';
 import '../../collections/presentation/collections_screen.dart';
 import '../../gamification/domain/gamification_summary.dart';
 import '../../gamification/presentation/widgets/missions_modal_sheet.dart';
 import '../../gamification/presentation/widgets/tauti_mascot_card.dart';
 import '../../gamification/providers/gamification_providers.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../share_intent/data/link_repository.dart';
 import '../../share_intent/domain/dirty_url_parser.dart';
 import '../../share_intent/presentation/quick_taut_bottom_sheet.dart';
 import '../providers/feed_providers.dart';
@@ -73,14 +75,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  void _submitSearch(String query) {
+    _debounceTimer?.cancel();
+    ref.read(searchQueryProvider.notifier).setQuery(query.trim());
+  }
+
   void _clearSearch() {
     _searchController.clear();
     _debounceTimer?.cancel();
     ref.read(searchQueryProvider.notifier).setQuery('');
   }
 
-  Future<void> _openQuickAdd() async {
-    final TextEditingController urlInput = TextEditingController();
+  Future<void> _pasteFromClipboardAndOpen() async {
+    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    final String? text = data?.text?.trim();
+    if (text != null && text.isNotEmpty) {
+      final ParsedShareInput? parsed = DirtyUrlParser.parse(text);
+      if (parsed != null && mounted) {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (BuildContext ctx) => QuickTautBottomSheet(
+            sharedText: text,
+          ),
+        );
+        ref.invalidate(feedProvider);
+        ref.invalidate(resurfaceLinksProvider);
+        return;
+      }
+    }
+    await _openQuickAdd(initialText: text);
+  }
+
+  Future<void> _openQuickAdd({String? initialText}) async {
+    final TextEditingController urlInput =
+        TextEditingController(text: initialText ?? '');
     final bool? shouldSave = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -273,52 +303,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
 
-          // Search Field
+          // Search Field (.search / .dksearch)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Container(
-                height: 52,
+                height: isDark ? 48 : 52,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   color: isDark ? TautinColors.darkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(isDark ? 24 : 26),
+                  border: isDark
+                      ? Border.all(color: TautinColors.darkBorder)
+                      : null,
                   boxShadow: <BoxShadow>[
                     BoxShadow(
-                      color: TautinColors.brandTeal.withValues(alpha: 0.08),
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.25)
+                          : TautinColors.brandTeal.withValues(alpha: 0.08),
                       blurRadius: 18,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    filled: false,
-                    hintText: 'Cari barang, resep, topik, atau #tag...',
-                    hintStyle: TextStyle(
-                      fontSize: 14.5,
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      Icons.search_rounded,
                       color: isDark
                           ? TautinColors.textSecondaryDark
-                          : const Color(0xFF5A7580),
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: TautinColors.brandTeal,
+                          : const Color(0xFF3B5E6C),
                       size: 22,
                     ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 20),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        onSubmitted: _submitSearch,
+                        textInputAction: TextInputAction.search,
+                        style: TextStyle(
+                          fontSize: isDark ? 13.5 : 14.5,
+                          color: isDark
+                              ? TautinColors.textPrimaryDark
+                              : TautinColors.brandTeal,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Cari barang, resep, topik, atau #tag...',
+                          hintStyle: TextStyle(
+                            fontSize: isDark ? 13.5 : 14.5,
+                            color: isDark
+                                ? TautinColors.textSecondaryDark
+                                : const Color(0xFF5A7580),
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 20),
+                        onPressed: _clearSearch,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -386,45 +438,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
 
-          // Filter Chips Row
+          // Filter Chips Row (.chips / .dkchips)
           SliverToBoxAdapter(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 children: FeedFilter.values.map((FeedFilter f) {
                   final bool isSelected = activeFilter == f;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      selected: isSelected,
-                      showCheckmark: false,
-                      label: Text(f.label),
-                      labelStyle: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected
-                            ? (isDark ? TautinColors.darkTeal : TautinColors.creamBackground)
-                            : (isDark ? TautinColors.textPrimaryDark : TautinColors.brandTeal),
-                      ),
-                      backgroundColor:
-                          isDark ? TautinColors.darkCard : Colors.white,
-                      selectedColor:
-                          isDark ? TautinColors.mintAccent : TautinColors.brandTeal,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: isSelected
-                              ? Colors.transparent
-                              : (isDark
-                                  ? TautinColors.darkBackground
-                                  : TautinColors.mistTeal.withValues(alpha: 0.8)),
-                        ),
-                      ),
-                      onSelected: (_) {
-                        ref.read(activeFilterProvider.notifier).setFilter(f);
-                      },
-                    ),
+                    child: _buildFilterChip(f, isSelected, isDark),
                   );
                 }).toList(),
               ),
@@ -447,7 +471,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      const Icon(Icons.cloud_off_rounded, size: 48, color: TautinColors.errorRed),
+                      const Icon(Icons.cloud_off_rounded,
+                          size: 48, color: TautinColors.errorRed),
                       const SizedBox(height: 12),
                       Text(
                         'Gagal memuat feed.',
@@ -467,42 +492,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             data: (FeedState state) {
               if (state.links.isEmpty) {
-                return SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          const Text('🌾', style: TextStyle(fontSize: 48)),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Belum ada tautan',
-                            style: TautinTheme.jakartaHeading(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? TautinColors.textPrimaryDark
-                                  : TautinColors.brandTeal,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Bagikan tautan dari TikTok, Shopee, atau Chrome ke Tautin.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: isDark
-                                  ? TautinColors.textSecondaryDark
-                                  : TautinColors.textSecondaryLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
+                if (_searchController.text.trim().isNotEmpty) {
+                  return _buildEmptySearchResults(context, isDark);
+                }
+                return _buildEmptyFeedSteps(context, isDark);
               }
 
               return SliverList(
@@ -526,7 +519,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     return SmartLinkCard(
                       link: link,
                       onTap: () {
-                        context.push('${AppRoutes.home}/detail/${link.id}', extra: link);
+                        context.push(
+                          '${AppRoutes.home}/detail/${link.id}',
+                          extra: link,
+                        );
+                      },
+                      onOpen: () {
+                        context.push(
+                          '${AppRoutes.home}/detail/${link.id}',
+                          extra: link,
+                        );
+                      },
+                      onPinToggle: () async {
+                        HapticFeedback.lightImpact();
+                        final bool newPin = !link.isPinned;
+                        final LinkModel updated =
+                            link.copyWith(isPinned: newPin);
+                        ref
+                            .read(feedProvider.notifier)
+                            .updateLinkOptimistically(updated);
+                        try {
+                          await ref
+                              .read(linkRepositoryProvider)
+                              .updateLink(link.id, isPinned: newPin);
+                        } catch (_) {}
                       },
                       onQuotaBannerTap: () {
                         context.push(AppRoutes.paywall);
@@ -537,6 +553,351 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(FeedFilter filter, bool isSelected, bool isDark) {
+    final Color bgColor;
+    final Color textColor;
+    Border? border;
+
+    if (isDark) {
+      if (isSelected) {
+        bgColor = TautinColors.mintAccent;
+        textColor = TautinColors.brandTeal;
+        border = null;
+      } else {
+        bgColor = TautinColors.darkCard;
+        textColor = TautinColors.textSecondaryDark;
+        border = Border.all(color: TautinColors.darkBorder);
+      }
+    } else {
+      if (isSelected) {
+        bgColor = TautinColors.brandTeal;
+        textColor = TautinColors.creamBackground;
+        border = null;
+      } else {
+        bgColor = Colors.white;
+        textColor = TautinColors.brandTeal;
+        border = null;
+      }
+    }
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        ref.read(activeFilterProvider.notifier).setFilter(filter);
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: isDark ? 36 : 40,
+        padding: EdgeInsets.symmetric(horizontal: isDark ? 16 : 18),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: border,
+          boxShadow: (!isDark && !isSelected)
+              ? <BoxShadow>[
+                  BoxShadow(
+                    color: TautinColors.brandTeal.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          filter.label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: isDark ? 13 : 14,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptySearchResults(BuildContext context, bool isDark) {
+    final String query = _searchController.text.trim();
+    final List<String> suggestions = <String>[
+      'resep ayam',
+      'rendang sapi',
+      'masakan mudah',
+    ];
+
+    return SliverFillRemaining(
+      hasScrollBody: false,
+      child: Center(
+        child: Padding(
+          padding:
+              const EdgeInsets.only(top: 24, left: 28, right: 28, bottom: 96),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              const TautiMascot(
+                mood: TautiMood.think,
+                width: 130,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Belum ada yang cocok',
+                style: TautinTheme.jakartaHeading(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: isDark
+                      ? TautinColors.textPrimaryDark
+                      : TautinColors.brandTeal,
+                  letterSpacing: -0.02,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tauti belum menemukan tautan untuk “$query”. Coba kata kunci lain atau simpan tautan barunya.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: isDark
+                      ? TautinColors.textSecondaryDark
+                      : TautinColors.seamTeal,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: suggestions.map((String s) {
+                  return InkWell(
+                    onTap: () {
+                      _searchController.text = s;
+                      _submitSearch(s);
+                    },
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? TautinColors.darkCard : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: isDark
+                            ? Border.all(color: TautinColors.darkBorder)
+                            : null,
+                      ),
+                      child: Text(
+                        s,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? TautinColors.textPrimaryDark
+                              : TautinColors.brandTeal,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: _openQuickAdd,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: isDark
+                        ? TautinColors.mintAccent
+                        : TautinColors.brandTeal,
+                    foregroundColor: isDark
+                        ? TautinColors.brandTeal
+                        : TautinColors.creamBackground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text(
+                    'Simpan tautan baru',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyFeedSteps(BuildContext context, bool isDark) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding:
+            const EdgeInsets.only(top: 14, left: 20, right: 20, bottom: 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Simpan dalam 3 langkah',
+              style: TautinTheme.jakartaHeading(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: isDark
+                    ? TautinColors.textPrimaryDark
+                    : TautinColors.brandTeal,
+                letterSpacing: -0.02,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildStepCard(
+              number: '1',
+              title: 'Buka aplikasi apa saja',
+              subtitle: 'TikTok, Shopee, Instagram, atau Chrome',
+              isDark: isDark,
+            ),
+            const SizedBox(height: 10),
+            _buildStepCard(
+              number: '2',
+              title: 'Tekan tombol Bagikan',
+              subtitle: 'Ikon share di tautan yang kamu suka',
+              isDark: isDark,
+            ),
+            const SizedBox(height: 10),
+            _buildStepCard(
+              number: '3',
+              title: 'Pilih Tautin',
+              subtitle: 'AI merangkum dan merapikannya untukmu',
+              isDark: isDark,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: _pasteFromClipboardAndOpen,
+              borderRadius: BorderRadius.circular(25),
+              child: Container(
+                height: 50,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: isDark
+                        ? TautinColors.darkBorder
+                        : TautinColors.brandTeal,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(
+                      Icons.content_paste_rounded,
+                      size: 18,
+                      color: isDark
+                          ? TautinColors.textPrimaryDark
+                          : TautinColors.brandTeal,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tempel tautan dari clipboard',
+                      style: TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: isDark
+                            ? TautinColors.textPrimaryDark
+                            : TautinColors.brandTeal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepCard({
+    required String number,
+    required String title,
+    required String subtitle,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? TautinColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: isDark ? Border.all(color: TautinColors.darkBorder) : null,
+        boxShadow: isDark
+            ? null
+            : <BoxShadow>[
+                BoxShadow(
+                  color: TautinColors.brandTeal.withValues(alpha: 0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: TautinColors.mintAccent,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              number,
+              style: const TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: TautinColors.brandTeal,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: isDark
+                        ? TautinColors.textPrimaryDark
+                        : TautinColors.brandTeal,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: isDark
+                        ? TautinColors.textSecondaryDark
+                        : TautinColors.seamTeal,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

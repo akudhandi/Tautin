@@ -45,11 +45,15 @@ class SmartLinkCard extends StatelessWidget {
     super.key,
     required this.link,
     this.onTap,
+    this.onOpen,
+    this.onPinToggle,
     this.onQuotaBannerTap,
   });
 
   final LinkModel link;
   final VoidCallback? onTap;
+  final VoidCallback? onOpen;
+  final VoidCallback? onPinToggle;
   final VoidCallback? onQuotaBannerTap;
 
   @override
@@ -58,60 +62,78 @@ class SmartLinkCard extends StatelessWidget {
     final bool isDark = theme.brightness == Brightness.dark;
 
     final Color cardBg = isDark ? TautinColors.darkCard : Colors.white;
-    final Color borderColor = isDark
-        ? TautinColors.darkBackground
-        : TautinColors.mistTeal.withValues(alpha: 0.6);
+    final Border border = link.isPinned
+        ? Border.all(
+            color: isDark ? TautinColors.mintAccent : TautinColors.brandTeal,
+            width: 2.5,
+          )
+        : (isDark
+            ? Border.all(color: TautinColors.darkBorder)
+            : Border.all(color: Colors.transparent));
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: TautinColors.brandTeal.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(isDark ? 24 : 28),
+        border: border,
+        boxShadow: isDark
+            ? <BoxShadow>[
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : <BoxShadow>[
+                BoxShadow(
+                  color: TautinColors.brandTeal.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(isDark ? 24 : 28),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                // Header row: Domain + relative time + pin
+                // Header row: Domain + relative time + pin status
                 Row(
                   children: <Widget>[
                     Icon(
                       _iconForSource(link.sourceType),
                       size: 15,
-                      color: TautinColors.textSecondaryLight,
+                      color: isDark
+                          ? TautinColors.textSecondaryDark
+                          : TautinColors.textSecondaryLight,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       link.domain,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w700,
+                        fontSize: isDark ? 12 : 13,
                         color: isDark
-                            ? TautinColors.textSecondaryDark
-                            : TautinColors.textSecondaryLight,
+                            ? TautinColors.textPrimaryDark
+                            : TautinColors.brandTeal,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
-                      '· ${formatRelativeTime(link.updatedAt)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      formatRelativeTime(link.updatedAt),
+                      style: TextStyle(
+                        fontSize: 12,
                         color: isDark
                             ? TautinColors.textSecondaryDark
-                            : TautinColors.textSecondaryLight,
+                            : TautinColors.seamTeal,
                       ),
                     ),
                     const Spacer(),
@@ -119,19 +141,14 @@ class SmartLinkCard extends StatelessWidget {
                       Container(
                         width: 7,
                         height: 7,
-                        decoration: const BoxDecoration(
-                          color: TautinColors.brandTeal,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? TautinColors.mintAccent
+                              : TautinColors.brandTeal,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 8),
                     ],
-                    if (link.isPinned)
-                      const Icon(
-                        Icons.push_pin_rounded,
-                        size: 16,
-                        color: TautinColors.brandTeal,
-                      ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -140,12 +157,12 @@ class SmartLinkCard extends StatelessWidget {
                 if (link.thumbnailUrl != null &&
                     link.thumbnailUrl!.trim().isNotEmpty) ...<Widget>[
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     child: Stack(
                       alignment: Alignment.center,
                       children: <Widget>[
                         SizedBox(
-                          height: 140,
+                          height: 120,
                           width: double.infinity,
                           child: CachedNetworkImage(
                             imageUrl: link.thumbnailUrl!,
@@ -218,7 +235,7 @@ class SmartLinkCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                 ],
 
                 // Title
@@ -228,21 +245,24 @@ class SmartLinkCard extends StatelessWidget {
                       : link.url,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
+                  style: TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w700,
+                    fontSize: isDark ? 15 : 16.5,
                     height: 1.25,
+                    letterSpacing: -0.01,
                     color: isDark
                         ? TautinColors.textPrimaryDark
-                        : TautinColors.textPrimaryLight,
+                        : TautinColors.brandTeal,
                   ),
                 ),
                 const SizedBox(height: 10),
 
                 // AI Summary / Pending Shimmer / Quota Banner
                 _buildSummarySection(context, isDark),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
-                // Bottom row: Collection label + tags
+                // Footer row: Collection label + tags
                 Row(
                   children: <Widget>[
                     if (link.collection != null) ...<Widget>[
@@ -255,7 +275,7 @@ class SmartLinkCard extends StatelessWidget {
                           color: isDark
                               ? TautinColors.mossAltDark
                               : TautinColors.iceBlue,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -274,7 +294,8 @@ class SmartLinkCard extends StatelessWidget {
                                 link.collection!.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(
+                                style: TextStyle(
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: isDark
                                       ? TautinColors.iceBlue
@@ -297,10 +318,11 @@ class SmartLinkCard extends StatelessWidget {
                                 padding: const EdgeInsets.only(right: 6),
                                 child: Text(
                                   '#${tag.name}',
-                                  style: theme.textTheme.labelSmall?.copyWith(
+                                  style: TextStyle(
+                                    fontSize: 12,
                                     color: isDark
                                         ? TautinColors.textSecondaryDark
-                                        : TautinColors.textTertiaryLight,
+                                        : TautinColors.seamTeal,
                                   ),
                                 ),
                               ),
@@ -310,11 +332,132 @@ class SmartLinkCard extends StatelessWidget {
                     ),
                   ],
                 ),
+
+                // Actions row (.lc-act): Buka tautan & Pin button
+                const SizedBox(height: 12),
+                _buildActionButtons(context, isDark),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context, bool isDark) {
+    // Buka Tautan styling (.btn-open)
+    final Color openBg;
+    final Color openText;
+    Border? openBorder;
+
+    if (isDark) {
+      if (link.isRead) {
+        openBg = TautinColors.darkCard;
+        openText = TautinColors.creamBackground;
+        openBorder = Border.all(color: TautinColors.darkBorder);
+      } else {
+        openBg = TautinColors.mintAccent;
+        openText = TautinColors.brandTeal;
+      }
+    } else {
+      if (link.isRead) {
+        openBg = TautinColors.mintAccent;
+        openText = TautinColors.brandTeal;
+      } else {
+        openBg = TautinColors.brandTeal;
+        openText = TautinColors.creamBackground;
+      }
+    }
+
+    // Pin button styling (.btn-pin)
+    final Color pinBg;
+    final Color pinColor;
+    Border? pinBorder;
+
+    if (isDark) {
+      if (link.isPinned) {
+        pinBg = TautinColors.mintAccent;
+        pinColor = TautinColors.brandTeal;
+      } else {
+        pinBg = TautinColors.darkCard;
+        pinColor = TautinColors.textSecondaryDark;
+        pinBorder = Border.all(color: TautinColors.darkBorder);
+      }
+    } else {
+      if (link.isPinned) {
+        pinBg = TautinColors.brandTeal;
+        pinColor = TautinColors.creamBackground;
+      } else {
+        pinBg = TautinColors.creamBackground;
+        pinColor = TautinColors.brandTeal;
+      }
+    }
+
+    return Row(
+      children: <Widget>[
+        // 1. Buka Tautan button
+        Expanded(
+          child: InkWell(
+            onTap: onOpen ?? onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: Container(
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: openBg,
+                borderRadius: BorderRadius.circular(22),
+                border: openBorder,
+              ),
+              child: Text(
+                link.isRead ? 'Buka tautan' : 'Buka & baca',
+                style: TextStyle(
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  color: openText,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // 2. Pin button
+        InkWell(
+          onTap: onPinToggle,
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: pinBg,
+              borderRadius: BorderRadius.circular(22),
+              border: pinBorder,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  Icons.push_pin_rounded,
+                  size: 16,
+                  color: pinColor,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  link.isPinned ? 'Tersemat' : 'Sematkan',
+                  style: TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: pinColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
