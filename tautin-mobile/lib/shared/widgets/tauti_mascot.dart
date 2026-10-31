@@ -369,10 +369,6 @@ class _TautiMascotPainter extends CustomPainter {
     if (mood == TautiMood.cheer) {
       _paintConfetti(canvas);
     }
-    // Costume back layers are inserted *before* `<g class="char">` in the
-    // mockup, so they sit behind the character and do not follow its
-    // transform (the cape never jumps).
-    _paintOutfitBack(canvas);
     _paintChar(canvas);
     if (mood == TautiMood.think) {
       _paintOrbit(canvas);
@@ -465,6 +461,11 @@ class _TautiMascotPainter extends CustomPainter {
   void _paintChar(Canvas canvas) {
     canvas.save();
     _applyCharTransform(canvas);
+
+    // Cape layers sit behind the whole character but, unlike the mockup (which
+    // places them outside `<g class="char">`), they follow the body so the cape
+    // moves with the jump/breathe.
+    _paintOutfitBack(canvas);
 
     // legs (thin)
     canvas.drawPath(
@@ -770,29 +771,6 @@ class _TautiMascotPainter extends CustomPainter {
             ..lineTo(136, 76),
           frame,
         );
-        // Magnifying glass.
-        canvas.drawPath(
-          Path()
-            ..moveTo(50, 158)
-            ..lineTo(38, 182),
-          _inkStroke(6),
-        );
-        canvas.drawCircle(
-          const Offset(34, 196),
-          13,
-          Paint()..color = _mist.withValues(alpha: 0.85),
-        );
-        canvas.drawCircle(const Offset(34, 196), 13, _inkStroke(4));
-        canvas.drawPath(
-          Path()
-            ..moveTo(27, 191)
-            ..quadraticBezierTo(31, 185, 39, 184),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..strokeCap = StrokeCap.round
-            ..color = Colors.white,
-        );
       case TautiOutfit.master:
         // Clasps + star medal.
         canvas.drawCircle(const Offset(68, 106), 9, Paint()..color = _mist);
@@ -865,9 +843,39 @@ class _TautiMascotPainter extends CustomPainter {
 
     canvas.save();
     _transformAbout(canvas, origin, rotateDeg: deg);
+    // The curator's magnifying glass is held by the left hand, so it rotates
+    // with that arm (`.cost-mag` is painted just below `<g class="armL">`).
+    if (left && outfit == TautiOutfit.curator) {
+      _paintMagnifier(canvas);
+    }
     canvas.drawPath(path, _thinPaint(4));
     canvas.drawCircle(hand, 5.5, Paint()..color = _ink);
     canvas.restore();
+  }
+
+  void _paintMagnifier(Canvas canvas) {
+    canvas.drawPath(
+      Path()
+        ..moveTo(50, 158)
+        ..lineTo(38, 182),
+      _inkStroke(6),
+    );
+    canvas.drawCircle(
+      const Offset(34, 196),
+      13,
+      Paint()..color = _mist.withValues(alpha: 0.85),
+    );
+    canvas.drawCircle(const Offset(34, 196), 13, _inkStroke(4));
+    canvas.drawPath(
+      Path()
+        ..moveTo(27, 191)
+        ..quadraticBezierTo(31, 185, 39, 184),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white,
+    );
   }
 
   double _armDegrees({required bool left}) {
