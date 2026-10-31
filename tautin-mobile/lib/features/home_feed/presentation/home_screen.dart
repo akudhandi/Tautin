@@ -381,7 +381,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           fontWeight: FontWeight.w600,
                           color: isDark
                               ? TautinColors.mintAccent
-                              : const Color(0xFF3B5E6C),
+                              : TautinColors.seamTeal,
                           decoration: TextDecoration.underline,
                         ),
                       ),

@@ -16,6 +16,17 @@ abstract final class TautinColors {
   static const Color darkTeal = Color(0xFF16323D);
   static const Color softBorder = Color(0xFFB9CDB0);
 
+  /// Cape seam / muted accent (`#3B5E6C`) used for tertiary copy in the light
+  /// mockup (`.lc-top span`, `.lc-foot`) and for the dark sheet grab handle.
+  static const Color seamTeal = Color(0xFF3B5E6C);
+
+  /// Moss surface of the dark AI box (`.dkai`, `.dkcol .ci`, `.dkrow .si`) and
+  /// the dark plan/thumb gradients.
+  static const Color mossDark = Color(0xFF25452F);
+
+  /// Slate surface used by the alternate dark collection icon (`.dkcol.alt .ci`).
+  static const Color mossAltDark = Color(0xFF1B3541);
+
   // Backward-compatible Brand Aliases
   static const Color primaryIndigo = brandTeal;
   static const Color aiViolet = mintAccent;
@@ -25,19 +36,33 @@ abstract final class TautinColors {
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color textPrimaryLight = brandTeal;
   static const Color textSecondaryLight = Color(0xFF5A7580);
-  static const Color aiSummaryBoxLight = Color(0xFFFFFFFF);
-  static const Color aiSummaryBorderLight = mistTeal;
+
+  /// `.lc-foot` muted copy / timestamps in the light mockup.
+  static const Color textTertiaryLight = seamTeal;
+
+  /// Light AI summary box (`.ai { background: #CAFFA6 }`).
+  static const Color aiSummaryBoxLight = mintAccent;
+  static const Color aiSummaryBorderLight = Colors.transparent;
 
   // Dark mode (Night Spruce) — values taken from the `.dk*` dark screens:
   // background `#16323D`, card `#1E3B47`, hairline border `#2E5563`,
-  // secondary text `#A9C6D0`.
+  // secondary text `#A9C6D0`, tertiary `#7F9BA5`.
   static const Color darkBackground = darkTeal;
   static const Color darkCard = Color(0xFF1E3B47);
   static const Color darkBorder = Color(0xFF2E5563);
   static const Color textPrimaryDark = creamBackground;
   static const Color textSecondaryDark = Color(0xFFA9C6D0);
-  static const Color aiSummaryBoxDark = darkTeal;
-  static const Color aiSummaryBorderDark = darkBorder;
+
+  /// `.dkrow` chevron / de-emphasised copy in the dark mockup.
+  static const Color textTertiaryDark = Color(0xFF7F9BA5);
+
+  /// Dark AI summary box (`.dkai { background: #25452F }`, no hairline).
+  static const Color aiSummaryBoxDark = mossDark;
+  static const Color aiSummaryBorderDark = Colors.transparent;
+
+  /// `.dkai-b` / `.dkres .rsum` muted body copy in the dark AI surfaces.
+  static const Color aiSummaryBodyDark = mistTeal;
+  static const Color aiSummaryBodyLight = brandTeal;
 
   // Semantic
   static const Color successGreen = Color(0xFF10B981);

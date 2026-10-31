@@ -216,7 +216,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 color: user?.isPro == true
                     ? TautinColors.mintAccent
                     : (isDark
-                        ? TautinColors.darkBackground
+                        ? TautinColors.darkBorder
                         : TautinColors.softBorder),
                 width: user?.isPro == true ? 2 : 1,
               ),
@@ -289,7 +289,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           fontWeight: FontWeight.w600,
                           color: isDark
                               ? TautinColors.textSecondaryDark
-                              : const Color(0xFF3B5E6C),
+                              : TautinColors.seamTeal,
                         ),
                       ),
                       Text(
@@ -312,10 +312,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       value: ((user?.aiQuotaLeft ?? 10) / 10).clamp(0.0, 1.0),
                       minHeight: 8,
                       backgroundColor: isDark
-                          ? TautinColors.darkBackground
+                          ? TautinColors.creamBackground.withValues(alpha: 0.14)
                           : TautinColors.mistTeal.withValues(alpha: 0.5),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        TautinColors.brandTeal,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isDark ? TautinColors.mintAccent : TautinColors.brandTeal,
                       ),
                     ),
                   ),

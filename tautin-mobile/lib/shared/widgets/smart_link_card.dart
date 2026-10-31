@@ -253,17 +253,19 @@ class SmartLinkCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? TautinColors.darkBackground
-                              : TautinColors.creamBackground,
+                              ? TautinColors.mossAltDark
+                              : TautinColors.iceBlue,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            const Icon(
+                            Icon(
                               Icons.folder_outlined,
                               size: 13,
-                              color: TautinColors.brandTeal,
+                              color: isDark
+                                  ? TautinColors.iceBlue
+                                  : TautinColors.brandTeal,
                             ),
                             const SizedBox(width: 5),
                             ConstrainedBox(
@@ -274,7 +276,9 @@ class SmartLinkCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: TautinColors.brandTeal,
+                                  color: isDark
+                                      ? TautinColors.iceBlue
+                                      : TautinColors.brandTeal,
                                 ),
                               ),
                             ),
@@ -296,7 +300,7 @@ class SmartLinkCard extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: isDark
                                         ? TautinColors.textSecondaryDark
-                                        : TautinColors.textSecondaryLight,
+                                        : TautinColors.textTertiaryLight,
                                   ),
                                 ),
                               ),
@@ -318,21 +322,19 @@ class SmartLinkCard extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
 
     // 1. Pending / Processing state -> Shimmer effect
+    // Light mockup: `.ai.pending { background: linear-gradient(90deg,#CAFFA6,
+    // #E6FFD3,#CAFFA6) }`; dark equivalent reuses the moss dark surface.
     if (link.isPending) {
       return Shimmer.fromColors(
-        baseColor: isDark
-            ? TautinColors.darkBackground
-            : TautinColors.creamBackground,
+        baseColor: isDark ? TautinColors.mossDark : TautinColors.mintAccent,
         highlightColor: isDark
-            ? TautinColors.darkCard
-            : Colors.white,
+            ? TautinColors.mossAltDark
+            : const Color(0xFFE6FFD3),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark
-                ? TautinColors.darkBackground
-                : TautinColors.creamBackground,
+            color: isDark ? TautinColors.mossDark : TautinColors.mintAccent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -356,36 +358,37 @@ class SmartLinkCard extends StatelessWidget {
       );
     }
 
-    // 2. Completed with summary -> Soft AI Summary Box
+    // 2. Completed with summary -> AI summary box.
+    // Light `.ai { background: #CAFFA6 }`, dark `.dkai { background: #25452F }`,
+    // neither has a hairline; `.dkai-h` is mint, `.dkai-b` is `#D6E6EA`.
     if (link.aiSummary != null && link.aiSummary!.trim().isNotEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDark
-              ? TautinColors.darkBackground
-              : TautinColors.creamBackground.withValues(alpha: 0.65),
+          color: isDark ? TautinColors.mossDark : TautinColors.mintAccent,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: TautinColors.mintAccent.withValues(alpha: 0.5),
-          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
-                const Icon(
+                Icon(
                   Icons.auto_awesome,
                   size: 14,
-                  color: TautinColors.brandTeal,
+                  color: isDark
+                      ? TautinColors.mintAccent
+                      : TautinColors.brandTeal,
                 ),
                 const SizedBox(width: 5),
                 Text(
                   'Ringkasan AI',
                   style: theme.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: TautinColors.brandTeal,
+                    color: isDark
+                        ? TautinColors.mintAccent
+                        : TautinColors.brandTeal,
                   ),
                 ),
               ],
@@ -398,8 +401,8 @@ class SmartLinkCard extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 height: 1.4,
                 color: isDark
-                    ? TautinColors.textPrimaryDark
-                    : TautinColors.textPrimaryLight,
+                    ? TautinColors.aiSummaryBodyDark
+                    : TautinColors.aiSummaryBodyLight,
               ),
             ),
           ],

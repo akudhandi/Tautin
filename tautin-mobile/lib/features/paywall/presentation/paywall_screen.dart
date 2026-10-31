@@ -325,12 +325,12 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                             ),
                           ),
                         ),
-                        const Text(' · ', style: TextStyle(color: Color(0xFF3B5E6C))),
+                        const Text(' · ', style: TextStyle(color: TautinColors.seamTeal)),
                         const Text(
                           'Batalkan kapan saja di Google Play',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF3B5E6C),
+                            color: TautinColors.seamTeal,
                           ),
                         ),
                       ],
@@ -444,7 +444,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                         subtitle,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF3B5E6C),
+                          color: TautinColors.seamTeal,
                         ),
                       ),
                     ],
@@ -467,7 +467,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       period,
                       style: const TextStyle(
                         fontSize: 11.5,
-                        color: Color(0xFF3B5E6C),
+                        color: TautinColors.seamTeal,
                       ),
                     ),
                   ],

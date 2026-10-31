@@ -524,7 +524,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                           fontSize: 13,
                           color: isDark
                               ? TautinColors.textSecondaryDark
-                              : const Color(0xFF3B5E6C),
+                              : TautinColors.seamTeal,
                         ),
                       ),
                     ],
@@ -684,7 +684,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                               letterSpacing: 0.06,
                               color: isDark
                                   ? TautinColors.textSecondaryDark
-                                  : const Color(0xFF3B5E6C),
+                                  : TautinColors.seamTeal,
                             ),
                           ),
                           Row(
@@ -696,7 +696,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                                 size: 14,
                                 color: isDark
                                     ? TautinColors.textSecondaryDark
-                                    : const Color(0xFF3B5E6C),
+                                    : TautinColors.seamTeal,
                               ),
                               const SizedBox(width: 4),
                               Text(
@@ -705,7 +705,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                                   fontSize: 12,
                                   color: isDark
                                       ? TautinColors.textSecondaryDark
-                                      : const Color(0xFF3B5E6C),
+                                      : TautinColors.seamTeal,
                                 ),
                               ),
                             ],

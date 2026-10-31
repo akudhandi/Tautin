@@ -348,7 +348,7 @@ class _TautiMascotPainter extends CustomPainter {
   static const Color _mist = TautinColors.creamBackground; // #F7F9E1
   static const Color _sky = TautinColors.iceBlue; // #A9E0F1
   static const Color _limeDeep = Color(0xFFB3F08A);
-  static const Color _capeSeam = Color(0xFF3B5E6C);
+  static const Color _capeSeam = TautinColors.seamTeal;
 
   // viewBox 0 0 200 250
   static const Size _vb = Size(200, 250);
