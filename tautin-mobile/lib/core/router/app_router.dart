@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../dev/mascot_gallery_screen.dart';
 import '../../features/auth/presentation/onboarding_login_screen.dart';
 import '../../features/collections/presentation/collections_screen.dart';
 import '../../features/home_feed/presentation/home_screen.dart';
@@ -22,6 +23,8 @@ abstract final class AppRoutes {
   static const String collections = '/collections';
   static const String settings = '/settings';
   static const String linkDetail = '/home/detail/:id';
+  // TODO(dev): temporary mascot preview route — remove with the screen.
+  static const String devMascot = '/dev/mascot';
 }
 
 /// App navigation graph.
@@ -32,8 +35,14 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
   final LocalStorage storage = ref.watch(localStorageProvider);
   final bool signedIn = storage.hasSession;
 
+  // TODO(dev): `--dart-define=PREVIEW_ROUTE=/dev/mascot` forces the initial
+  // screen for device previews. Remove with the mascot gallery screen.
+  const String previewRoute = String.fromEnvironment('PREVIEW_ROUTE');
+
   return GoRouter(
-    initialLocation: signedIn ? AppRoutes.home : AppRoutes.onboarding,
+    initialLocation: previewRoute.isNotEmpty
+        ? previewRoute
+        : (signedIn ? AppRoutes.home : AppRoutes.onboarding),
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.onboarding,
@@ -84,6 +93,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         name: 'settings',
         builder: (BuildContext context, GoRouterState state) =>
             const SettingsScreen(),
+      ),
+      // TODO(dev): temporary mascot preview route — remove with the screen.
+      GoRoute(
+        path: AppRoutes.devMascot,
+        name: 'devMascot',
+        builder: (BuildContext context, GoRouterState state) =>
+            const MascotGalleryScreen(),
       ),
     ],
   );
