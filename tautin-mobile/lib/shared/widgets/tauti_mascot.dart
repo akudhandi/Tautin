@@ -9,24 +9,52 @@ import '../../core/theme/tautin_theme.dart';
 /// `m-poke`).
 enum TautiMood { idle, happy, think, read, cheer, sleep, poke }
 
+/// Costumes the mascot can wear, mirroring the `COSTUMES` map of the mockup.
+///
+/// A costume is independent of the [TautiMood]: every mood can be combined with
+/// every costume. [level] is the level at which the costume unlocks.
+enum TautiOutfit {
+  /// The plain mascot, no costume.
+  none(0),
+
+  /// Kurator Cilik — vest, glasses and a magnifying glass.
+  curator(5),
+
+  /// Master Tautan — short cape with clasps and a star medal.
+  master(10),
+
+  /// Legenda Tautin — long cape, crown and a sparkling aura.
+  legend(20);
+
+  const TautiOutfit(this.level);
+
+  /// Level at which this costume unlocks.
+  final int level;
+}
+
 /// The Tauti mascot, drawn straight from the geometry, transforms and
 /// keyframes defined in `opendesign-tautin.html`.
 ///
 /// The mockup renders a `viewBox="0 0 200 250"` SVG and animates it with CSS
-/// keyframes (`breathe`, `blink`, `idleWave`, `jump`, `tilt`, `wiggle`,
-/// `breatheSleep`, `spin`, `cheerL/R`, `sparkPop`, `fall`, `zfloat`). CSS is
-/// not reproducible 1:1 in Flutter, so every phase below is re-implemented with
-/// a dedicated [AnimationController] using the exact same timing values.
+/// keyframes (`breathe`, `breatheSleep`, `blink`, `linkWig`, `idleWave`,
+/// `jump`, `shadowJump`, `tilt`, `wiggle`, `spin`, `cheerL/R`, `sparkPop`,
+/// `fall`, `zfloat`, `capeSway`, `twinkle`, `medalPulse`). CSS is not
+/// reproducible 1:1 in Flutter, so every phase below is re-implemented with a
+/// dedicated [AnimationController] using the exact same timing values.
 class TautiMascot extends StatefulWidget {
   const TautiMascot({
     super.key,
     this.mood = TautiMood.idle,
+    this.outfit = TautiOutfit.none,
     this.width = 120,
     this.animate = true,
   });
 
   /// Which pose/behaviour the mascot should hold.
   final TautiMood mood;
+
+  /// Costume worn on top of the base character.
+  final TautiOutfit outfit;
 
   /// Rendered width. Height follows the 200:250 viewBox ratio.
   final double width;
@@ -47,6 +75,8 @@ class _TautiMascotState extends State<TautiMascot>
   late final AnimationController _blink = _make(4200);
   late final AnimationController _idleWave = _make(6000);
   late final AnimationController _jump = _make(950);
+  late final AnimationController _shadow = _make(950);
+  late final AnimationController _link = _make(3200);
   late final AnimationController _tilt = _make(1800);
   late final AnimationController _wiggle = _make(600);
   late final AnimationController _sleep = _make(4000);
@@ -55,12 +85,18 @@ class _TautiMascotState extends State<TautiMascot>
   late final AnimationController _zzz = _make(2600);
   late final AnimationController _spark = _make(900);
   late final AnimationController _cheer = _make(400);
+  late final AnimationController _cape = _make(4600);
+  late final AnimationController _capeLong = _make(5800);
+  late final AnimationController _twinkle = _make(2800);
+  late final AnimationController _medal = _make(3600);
 
   late final List<AnimationController> _all = <AnimationController>[
     _breathe,
     _blink,
     _idleWave,
     _jump,
+    _shadow,
+    _link,
     _tilt,
     _wiggle,
     _sleep,
@@ -69,6 +105,10 @@ class _TautiMascotState extends State<TautiMascot>
     _zzz,
     _spark,
     _cheer,
+    _cape,
+    _capeLong,
+    _twinkle,
+    _medal,
   ];
 
   late final Listenable _repaint = Listenable.merge(_all);
@@ -86,12 +126,14 @@ class _TautiMascotState extends State<TautiMascot>
   void didUpdateWidget(TautiMascot oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mood != widget.mood ||
+        oldWidget.outfit != widget.outfit ||
         oldWidget.animate != widget.animate) {
       _sync();
     }
   }
 
-  /// Starts exactly the animations the current mood needs, resetting the rest.
+  /// Starts exactly the animations the current mood/outfit needs, resetting the
+  /// rest.
   void _sync() {
     for (final AnimationController c in _all) {
       c.stop();
@@ -102,33 +144,63 @@ class _TautiMascotState extends State<TautiMascot>
       return;
     }
 
+    // `.mascot .link { animation: linkWig 3.2s ease-in-out infinite; }` — the
+    // chain above the head wiggles in *every* mood.
+    _link.repeat();
+
+    // `.mascot .eye { animation: blink 4.2s infinite; }`, but `.m-sleep`
+    // replaces the open eyes with closed lids.
+    if (widget.mood != TautiMood.sleep) {
+      _blink.repeat();
+    }
+
     switch (widget.mood) {
       case TautiMood.idle:
+        // `.m-idle .char` breathes for 2.8s, the right arm waves every 6s.
+        _breathe.duration = const Duration(milliseconds: 2800);
         _breathe.repeat();
-        _blink.repeat();
         _idleWave.repeat();
       case TautiMood.read:
+        // `.m-read .char { animation: breathe 3.6s ease-in-out infinite; }`
+        _breathe.duration = const Duration(milliseconds: 3600);
         _breathe.repeat();
-        _blink.repeat();
       case TautiMood.happy:
-        _blink.repeat();
-        _jump.forward(from: 0);
-        _spark.repeat();
-      case TautiMood.cheer:
-        _blink.repeat();
+        // The mockup re-applies the `m-happy` class every 2.6s
+        // (`setInterval(..., 2600)`), so `jump .95s` and `sparkPop .9s both`
+        // replay once per 2.6s cycle.
+        _jump.duration = const Duration(milliseconds: 2600);
         _jump.repeat();
+        _shadow.repeat();
+      case TautiMood.cheer:
+        // `.m-cheer .char { animation: jump .8s ease-out infinite; }`
+        _jump.duration = const Duration(milliseconds: 800);
+        _jump.repeat();
+        _shadow.repeat();
         _cheer.repeat();
         _confetti.repeat();
         _spark.repeat();
       case TautiMood.think:
-        _blink.repeat();
         _tilt.repeat(reverse: true);
         _orbit.repeat();
       case TautiMood.sleep:
+        // `.m-sleep .zzz` holds the floating `z`s.
         _sleep.repeat();
+        _zzz.repeat();
       case TautiMood.poke:
-        _blink.repeat();
+        // `.m-poke .char { animation: wiggle .6s ease-in-out 1; }`
         _wiggle.forward(from: 0);
+    }
+
+    switch (widget.outfit) {
+      case TautiOutfit.none:
+      case TautiOutfit.curator:
+        break;
+      case TautiOutfit.master:
+        _cape.repeat();
+        _medal.repeat();
+      case TautiOutfit.legend:
+        _capeLong.repeat();
+        _twinkle.repeat();
     }
   }
 
@@ -153,10 +225,13 @@ class _TautiMascotState extends State<TautiMascot>
             size: Size(widget.width, height),
             painter: _TautiMascotPainter(
               mood: widget.mood,
+              outfit: widget.outfit,
               breathe: _breathe.value,
               blink: _blink.value,
               idleWave: _idleWave.value,
               jump: _jump.value,
+              shadow: _shadow.value,
+              link: _link.value,
               tilt: _tilt.value,
               wiggle: _wiggle.value,
               sleep: _sleep.value,
@@ -165,6 +240,10 @@ class _TautiMascotState extends State<TautiMascot>
               zzz: _zzz.value,
               spark: _spark.value,
               cheer: _cheer.value,
+              cape: _cape.value,
+              capeLong: _capeLong.value,
+              twinkle: _twinkle.value,
+              medal: _medal.value,
             ),
           );
         },
@@ -180,6 +259,8 @@ class _MascotPhase {
     required this.blink,
     required this.idleWave,
     required this.jump,
+    required this.shadow,
+    required this.link,
     required this.tilt,
     required this.wiggle,
     required this.sleep,
@@ -188,12 +269,18 @@ class _MascotPhase {
     required this.zzz,
     required this.spark,
     required this.cheer,
+    required this.cape,
+    required this.capeLong,
+    required this.twinkle,
+    required this.medal,
   });
 
   final double breathe;
   final double blink;
   final double idleWave;
   final double jump;
+  final double shadow;
+  final double link;
   final double tilt;
   final double wiggle;
   final double sleep;
@@ -202,15 +289,22 @@ class _MascotPhase {
   final double zzz;
   final double spark;
   final double cheer;
+  final double cape;
+  final double capeLong;
+  final double twinkle;
+  final double medal;
 }
 
 class _TautiMascotPainter extends CustomPainter {
   _TautiMascotPainter({
     required this.mood,
+    required this.outfit,
     required double breathe,
     required double blink,
     required double idleWave,
     required double jump,
+    required double shadow,
+    required double link,
     required double tilt,
     required double wiggle,
     required double sleep,
@@ -219,11 +313,17 @@ class _TautiMascotPainter extends CustomPainter {
     required double zzz,
     required double spark,
     required double cheer,
+    required double cape,
+    required double capeLong,
+    required double twinkle,
+    required double medal,
   }) : phase = _MascotPhase(
           breathe: breathe,
           blink: blink,
           idleWave: idleWave,
           jump: jump,
+          shadow: shadow,
+          link: link,
           tilt: tilt,
           wiggle: wiggle,
           sleep: sleep,
@@ -232,9 +332,14 @@ class _TautiMascotPainter extends CustomPainter {
           zzz: zzz,
           spark: spark,
           cheer: cheer,
+          cape: cape,
+          capeLong: capeLong,
+          twinkle: twinkle,
+          medal: medal,
         );
 
   final TautiMood mood;
+  final TautiOutfit outfit;
   final _MascotPhase phase;
 
   // Palette from the mockup.
@@ -243,9 +348,16 @@ class _TautiMascotPainter extends CustomPainter {
   static const Color _mist = TautinColors.creamBackground; // #F7F9E1
   static const Color _sky = TautinColors.iceBlue; // #A9E0F1
   static const Color _limeDeep = Color(0xFFB3F08A);
+  static const Color _capeSeam = Color(0xFF3B5E6C);
 
   // viewBox 0 0 200 250
   static const Size _vb = Size(200, 250);
+
+  /// Default CSS `transform-box: view-box` origin: 50% 50% of the viewBox.
+  static const Offset _viewBoxOrigin = Offset(100, 125);
+
+  /// `.mascot .cape, .mascot .cape-long { transform-origin: 50% 8%; }`
+  static const Offset _capeOrigin = Offset(100, 87.3);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -257,6 +369,10 @@ class _TautiMascotPainter extends CustomPainter {
     if (mood == TautiMood.cheer) {
       _paintConfetti(canvas);
     }
+    // Costume back layers are inserted *before* `<g class="char">` in the
+    // mockup, so they sit behind the character and do not follow its
+    // transform (the cape never jumps).
+    _paintOutfitBack(canvas);
     _paintChar(canvas);
     if (mood == TautiMood.think) {
       _paintOrbit(canvas);
@@ -271,13 +387,30 @@ class _TautiMascotPainter extends CustomPainter {
     canvas.restore();
   }
 
+  // ---- Phases -------------------------------------------------------------
+
+  /// `jump` progress of the character.
+  ///
+  /// `.m-happy` replays its `.95s` jump once per `2.6s` cycle, while
+  /// `.m-cheer` loops its `.8s` jump non-stop, so the raw controller value is
+  /// stretched/clamped for happy.
+  double get _jumpT => mood == TautiMood.happy
+      ? (phase.jump * (2600 / 950)).clamp(0.0, 1.0)
+      : phase.jump;
+
   // ---- Groups -------------------------------------------------------------
 
   void _paintShadow(Canvas canvas) {
+    // `.m-happy .shadow, .m-cheer .shadow { shadowJump .95s ease-out infinite }`
     double s = 1;
     if (mood == TautiMood.happy || mood == TautiMood.cheer) {
-      // @keyframes shadowJump { 0,100%: scale(1); 45%: scale(.7) }
-      s = 1 - 0.3 * _piecewise(phase.jump, <double>[0, .45, 1], <double>[0, 1, 0]);
+      s = 1 -
+          0.3 *
+              _piecewise(
+                phase.shadow,
+                const <double>[0, .45, 1],
+                const <double>[0, 1, 0],
+              );
     }
     canvas.save();
     _transformAbout(canvas, const Offset(100, 238), scaleX: s, scaleY: s);
@@ -302,21 +435,29 @@ class _TautiMascotPainter extends CustomPainter {
     ];
     for (int i = 0; i < rects.length; i++) {
       final (double x, Color fill, double duration) = rects[i];
-      // animation-delay: i*0.17s, duration varies per rect.
-      final double p = ((phase.confetti * (1.6 / duration)) + i * 0.17) % 1.0;
-      final double dy = -10 + 250 * p; // @keyframes fall
+      // `.m-cheer .cf { animation: fall 1.6s linear infinite }` with
+      // `animation-duration` per rect and `animation-delay: i*0.17s`, so
+      // progress = ((t - delay) / duration) mod 1.
+      final double p =
+          _wrap(phase.confetti * (1.6 / duration) - (i * 0.17) / duration);
+      final double dy = -10 + 250 * p; // translateY(-10px) -> translateY(240px)
       final double rot = 540 * p * math.pi / 180;
       final double opacity = 1 - 0.3 * p;
       canvas.save();
-      canvas.translate(x + 3.5, -6 + 5.5);
-      canvas.rotate(rot);
-      canvas.translate(-(x + 3.5), -(-6 + 5.5));
       canvas.translate(0, dy);
-      final RRect r = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, -6, 7, 11),
-        const Radius.circular(3),
+      // `.spark, .cf { transform-box: fill-box; transform-origin: center }`
+      _transformAbout(
+        canvas,
+        Offset(x + 3.5, -0.5),
+        rotateRadians: rot,
       );
-      canvas.drawRRect(r, Paint()..color = fill.withValues(alpha: opacity));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, -6, 7, 11),
+          const Radius.circular(3),
+        ),
+        Paint()..color = fill.withValues(alpha: opacity),
+      );
       canvas.restore();
     }
   }
@@ -337,10 +478,14 @@ class _TautiMascotPainter extends CustomPainter {
       _thinPaint(4),
     );
 
-    // link (badge chain above the head) @keyframes linkWig about (100,46)
-    final double linkDeg = -4 + 9 * _triangle(phase.breathe * 1.0 + phase.tilt);
+    // link (badge chain above the head)
+    // `.mascot .link { transform-origin: 100px 46px; linkWig 3.2s }`
     canvas.save();
-    _transformAbout(canvas, const Offset(100, 46), rotateDeg: linkDeg);
+    _transformAbout(
+      canvas,
+      const Offset(100, 46),
+      rotateRadians: (-4 + 9 * _sine(phase.link)) * math.pi / 180,
+    );
     canvas.drawPath(
       Path()
         ..moveTo(100, 46)
@@ -394,6 +539,9 @@ class _TautiMascotPainter extends CustomPainter {
       _paintBook(canvas);
     }
 
+    // Costume front layers are inserted before `<g class="armL">`.
+    _paintOutfitFront(canvas);
+
     _paintArm(canvas, left: true);
     _paintArm(canvas, left: false);
 
@@ -427,7 +575,7 @@ class _TautiMascotPainter extends CustomPainter {
         stroke,
       );
     } else {
-      // @keyframes blink { 0,92,100%: scaleY(1); 96%: scaleY(.1) }
+      // `.mascot .eye { animation: blink 4.2s infinite; }`
       final double blinkY = _blinkScaleY(phase.blink);
       for (final double cx in <double>[84, 116]) {
         canvas.save();
@@ -520,6 +668,189 @@ class _TautiMascotPainter extends CustomPainter {
     );
   }
 
+  // ---- Costumes -----------------------------------------------------------
+
+  void _paintOutfitBack(Canvas canvas) {
+    switch (outfit) {
+      case TautiOutfit.none:
+      case TautiOutfit.curator:
+        break;
+      case TautiOutfit.master:
+        canvas.save();
+        // `.mascot .cape { transform-origin: 50% 8%; capeSway 4.6s }`
+        _transformAbout(
+          canvas,
+          _capeOrigin,
+          rotateRadians: (-0.8 + 1.8 * _sine(phase.cape)) * math.pi / 180,
+        );
+        canvas.drawPath(
+          _masterCapePath(),
+          Paint()..color = _sky,
+        );
+        canvas.drawPath(_masterCapePath(), _outlinePaint(5));
+        canvas.drawPath(
+          Path()
+            ..moveTo(42, 180)
+            ..cubicTo(66, 190, 134, 190, 158, 180),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3.2
+            ..strokeCap = StrokeCap.round
+            ..color = _capeSeam.withValues(alpha: 0.3),
+        );
+        canvas.restore();
+      case TautiOutfit.legend:
+        canvas.save();
+        // `.mascot .cape-long { transform-origin: 50% 8%; capeSway 5.8s }`
+        _transformAbout(
+          canvas,
+          _capeOrigin,
+          rotateRadians: (-0.8 + 1.8 * _sine(phase.capeLong)) * math.pi / 180,
+        );
+        canvas.drawPath(_legendCapePath(), Paint()..color = _mist);
+        canvas.drawPath(_legendCapePath(), _outlinePaint(5));
+        canvas.drawPath(
+          Path()
+            ..moveTo(30, 196)
+            ..cubicTo(58, 210, 142, 210, 170, 196),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 8
+            ..strokeCap = StrokeCap.round
+            ..color = _lime,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(33, 150)
+            ..cubicTo(40, 168, 37, 184, 34, 194),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 4
+            ..strokeCap = StrokeCap.round
+            ..color = _sky.withValues(alpha: 0.7),
+        );
+        canvas.restore();
+    }
+  }
+
+  void _paintOutfitFront(Canvas canvas) {
+    switch (outfit) {
+      case TautiOutfit.none:
+        break;
+      case TautiOutfit.curator:
+        // Vest.
+        canvas.drawPath(_curatorVestPath(), Paint()..color = _sky);
+        canvas.drawPath(_curatorVestPath(), _outlinePaint(5));
+        _drawOutlinedRect(
+          canvas,
+          rect: const Rect.fromLTWH(67, 151, 18, 13),
+          radius: 4,
+          strokeWidth: 3.2,
+        );
+        _drawOutlinedRect(
+          canvas,
+          rect: const Rect.fromLTWH(115, 151, 18, 13),
+          radius: 4,
+          strokeWidth: 3.2,
+        );
+        // Glasses.
+        final Paint lens = Paint()..color = _mist.withValues(alpha: 0.3);
+        canvas.drawCircle(const Offset(84, 84), 12, lens);
+        canvas.drawCircle(const Offset(116, 84), 12, lens);
+        final Paint frame = _inkStroke(3.6);
+        canvas.drawCircle(const Offset(84, 84), 12, frame);
+        canvas.drawCircle(const Offset(116, 84), 12, frame);
+        canvas.drawPath(
+          Path()
+            ..moveTo(96, 84)
+            ..lineTo(104, 84)
+            ..moveTo(73, 80)
+            ..lineTo(64, 76)
+            ..moveTo(127, 80)
+            ..lineTo(136, 76),
+          frame,
+        );
+        // Magnifying glass.
+        canvas.drawPath(
+          Path()
+            ..moveTo(50, 158)
+            ..lineTo(38, 182),
+          _inkStroke(6),
+        );
+        canvas.drawCircle(
+          const Offset(34, 196),
+          13,
+          Paint()..color = _mist.withValues(alpha: 0.85),
+        );
+        canvas.drawCircle(const Offset(34, 196), 13, _inkStroke(4));
+        canvas.drawPath(
+          Path()
+            ..moveTo(27, 191)
+            ..quadraticBezierTo(31, 185, 39, 184),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round
+            ..color = Colors.white,
+        );
+      case TautiOutfit.master:
+        // Clasps + star medal.
+        canvas.drawCircle(const Offset(68, 106), 9, Paint()..color = _mist);
+        canvas.drawCircle(const Offset(68, 106), 9, _inkStroke(4));
+        canvas.drawCircle(const Offset(132, 106), 9, Paint()..color = _mist);
+        canvas.drawCircle(const Offset(132, 106), 9, _inkStroke(4));
+        canvas.save();
+        // `.mascot .cost-medal { transform-origin: center; medalPulse 3.6s }`
+        _transformAbout(
+          canvas,
+          const Offset(100, 157),
+          scaleX: 1 + 0.06 * _sine(phase.medal),
+          scaleY: 1 + 0.06 * _sine(phase.medal),
+        );
+        canvas.drawCircle(const Offset(100, 157), 15, Paint()..color = _mist);
+        canvas.drawCircle(const Offset(100, 157), 15, _inkStroke(4.5));
+        canvas.drawPath(_starPath(), Paint()..color = _ink);
+        canvas.restore();
+      case TautiOutfit.legend:
+        // Crown.
+        canvas.drawPath(_crownPath(), Paint()..color = _lime);
+        final Paint crownStroke = _inkStroke(4.5)
+          ..strokeJoin = StrokeJoin.round;
+        canvas.drawPath(_crownPath(), crownStroke);
+        canvas.drawPath(
+          Path()
+            ..moveTo(78, 70)
+            ..quadraticBezierTo(100, 78, 122, 70),
+          crownStroke,
+        );
+        canvas.drawCircle(const Offset(84, 62), 2.8, Paint()..color = _mist);
+        canvas.drawCircle(const Offset(100, 64), 3.2, Paint()..color = _mist);
+        canvas.drawCircle(const Offset(116, 62), 2.8, Paint()..color = _mist);
+        // Sparkling aura. `.tw { transform-origin: center; twinkle 2.8s }`
+        const List<(double, double, double, Color, double)> aura =
+            <(double, double, double, Color, double)>[
+          (42, 78, .55, _mist, 0),
+          (160, 66, .45, _lime, .7),
+          (34, 132, .42, _mist, 1.3),
+          (166, 140, .5, _mist, 1.9),
+        ];
+        for (final (double x, double y, double s, Color color, double delay)
+            in aura) {
+          final double p = _wrap(phase.twinkle - delay / 2.8);
+          final double tw = .85 + 0.27 * _sine(p);
+          final double opacity = .35 + 0.65 * _sine(p);
+          canvas.save();
+          canvas.translate(x, y);
+          canvas.scale(s * tw);
+          canvas.drawPath(
+            _sparkPath(),
+            Paint()..color = color.withValues(alpha: opacity),
+          );
+          canvas.restore();
+        }
+    }
+  }
+
   void _paintArm(Canvas canvas, {required bool left}) {
     final double deg = _armDegrees(left: left);
     final Offset origin = left ? const Offset(56, 110) : const Offset(144, 110);
@@ -546,8 +877,8 @@ class _TautiMascotPainter extends CustomPainter {
           // @keyframes idleWave on the right arm.
           return _piecewise(
             phase.idleWave,
-            <double>[0, .58, .64, .71, .78, .85, .92, 1],
-            <double>[-8, -8, -152, -124, -152, -124, -8, -8],
+            const <double>[0, .58, .64, .71, .78, .85, .92, 1],
+            const <double>[-8, -8, -152, -124, -152, -124, -8, -8],
           );
         }
         return 8;
@@ -574,7 +905,7 @@ class _TautiMascotPainter extends CustomPainter {
       (38, 112, _ink),
     ];
     canvas.save();
-    // .orbit-spin: transform-origin 100px 82px; animation spin 2.6s linear.
+    // `.m-think .orbit-spin: transform-origin 100px 82px; animation spin 2.6s`
     _transformAbout(canvas, const Offset(100, 82), rotateDeg: 360 * phase.orbit);
     for (final (double x, double y, Color color) in sparks) {
       canvas.save();
@@ -596,10 +927,16 @@ class _TautiMascotPainter extends CustomPainter {
     ];
     for (final (double x, double y, double s, Color color, double delay)
         in sparks) {
-      // @keyframes sparkPop { 0%: scale(0),op0; 40%: scale(1.5),op1; 100%: scale(0),op0 }
-      final double p = (phase.spark + delay) % 1.0;
-      final double pop = _piecewise(p, <double>[0, .4, 1], <double>[0, 1.5, 0]);
-      final double opacity = _piecewise(p, <double>[0, .4, 1], <double>[0, 1, 0]);
+      // `@keyframes sparkPop { 0%: scale(0) op 0; 40%: scale(1.5) op 1;
+      // 100%: scale(0) op 0 }`. Happy uses `both` (plays once per cycle),
+      // cheer uses `infinite`.
+      final double p = mood == TautiMood.happy
+          ? ((phase.jump * 2600 - delay * 1000) / 900).clamp(0.0, 1.0)
+          : _wrap(phase.spark - delay / 0.9);
+      final double pop = _piecewise(p, const <double>[0, .4, 1],
+          const <double>[0, 1.5, 0]);
+      final double opacity = _piecewise(p, const <double>[0, .4, 1],
+          const <double>[0, 1, 0]);
       if (pop <= 0) {
         continue;
       }
@@ -615,7 +952,8 @@ class _TautiMascotPainter extends CustomPainter {
   }
 
   void _paintZzz(Canvas canvas) {
-    // text z at (132,58,22), (146,44,28,.8s), (160,28,34,1.6s)
+    // `<text class="z" x="132" y="58" font-size="22">` (+ 146/44/28, 160/28/34)
+    // with `animation-delay: .8s / 1.6s`.
     const List<(double, double, double, double)> zs =
         <(double, double, double, double)>[
       (132, 58, 22, 0),
@@ -623,15 +961,16 @@ class _TautiMascotPainter extends CustomPainter {
       (160, 28, 34, 1.6),
     ];
     for (final (double x, double y, double fontSize, double delay) in zs) {
-      // @keyframes zfloat 2.6s ease-in infinite
-      final double p = (phase.zzz + delay / 2.6) % 1.0;
-      final double dy = -46 * p;
-      final double dx = 22 * p;
-      final double sc = .6 + .6 * p;
-      final double opacity = p < .2 ? p / .2 : 1 - (p - .2) / .8;
-      canvas.save();
-      canvas.translate(x + dx, y + dy);
-      canvas.scale(sc);
+      // `@keyframes zfloat { 0%: translate(0,0) scale(.6) op 0;
+      // 20%: op 1; 100%: translate(22px,-46px) scale(1.2) op 0 }` — applied on
+      // the default view-box origin, so `scale` shrinks towards the viewBox
+      // centre before the translation is added.
+      final double p = _wrap(phase.zzz - delay / 2.6);
+      final double s = .6 + .6 * p;
+      final double px = _viewBoxOrigin.dx + s * (x - _viewBoxOrigin.dx) + 22 * p;
+      final double py = _viewBoxOrigin.dy + s * (y - _viewBoxOrigin.dy) - 46 * p;
+      final double opacity = _piecewise(p, const <double>[0, .2, 1],
+          const <double>[0, 1, 0]);
       final TextPainter tp = TextPainter(
         text: TextSpan(
           text: 'z',
@@ -644,46 +983,43 @@ class _TautiMascotPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
+      final double baseline =
+          tp.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+      tp.paint(canvas, Offset(px, py - baseline));
     }
   }
 
   // ---- Transforms ---------------------------------------------------------
 
   void _applyCharTransform(Canvas canvas) {
-    // .char: transform-origin 100px 236px
+    // `.char: transform-origin: 100px 236px`
     const Offset origin = Offset(100, 236);
     switch (mood) {
       case TautiMood.idle:
       case TautiMood.read:
-        // @keyframes breathe
         final double s = _sine(phase.breathe);
-        _transformAbout(canvas, origin, scaleX: 1 + .012 * s, scaleY: 1 + .025 * s);
+        _transformAbout(
+          canvas,
+          origin,
+          scaleX: 1 + .012 * s,
+          scaleY: 1 + .025 * s,
+        );
       case TautiMood.happy:
       case TautiMood.cheer:
-        // @keyframes jump
-        final double ty = _piecewise(
-          phase.jump,
-          <double>[0, .14, .45, .75, 1],
-          <double>[0, 0, -34, 0, 0],
-        );
-        final double sx = _piecewise(
-          phase.jump,
-          <double>[0, .14, .45, .75, 1],
-          <double>[1, 1.08, .95, 1.06, 1],
-        );
-        final double sy = _piecewise(
-          phase.jump,
-          <double>[0, .14, .45, .75, 1],
-          <double>[1, .9, 1.07, .92, 1],
-        );
+        // `@keyframes jump`
+        final double t = _jumpT;
+        final double ty = _piecewise(t, const <double>[0, .14, .45, .75, 1],
+            const <double>[0, 0, -34, 0, 0]);
+        final double sx = _piecewise(t, const <double>[0, .14, .45, .75, 1],
+            const <double>[1, 1.08, .95, 1.06, 1]);
+        final double sy = _piecewise(t, const <double>[0, .14, .45, .75, 1],
+            const <double>[1, .9, 1.07, .92, 1]);
         _transformAbout(canvas, origin, translateY: ty, scaleX: sx, scaleY: sy);
       case TautiMood.think:
-        // @keyframes tilt { from -3deg to 3deg }
+        // `@keyframes tilt { from: rotate(-3deg) to: rotate(3deg) }`
         _transformAbout(canvas, origin, rotateDeg: -3 + 6 * phase.tilt);
       case TautiMood.sleep:
-        // @keyframes breatheSleep: rotate(5deg) scale(1..1.02, 1..1.035)
+        // `@keyframes breatheSleep { rotate(5deg) scale(1..1.02, 1..1.035) }`
         final double s = _sine(phase.sleep);
         _transformAbout(
           canvas,
@@ -693,12 +1029,9 @@ class _TautiMascotPainter extends CustomPainter {
           scaleY: 1 + .035 * s,
         );
       case TautiMood.poke:
-        // @keyframes wiggle { 0,100%: 0; 20%: -7; 45%: 6; 70%: -4 }
-        final double deg = _piecewise(
-          phase.wiggle,
-          <double>[0, .2, .45, .7, 1],
-          <double>[0, -7, 6, -4, 0],
-        );
+        // `@keyframes wiggle { 0,100%: 0; 20%: -7; 45%: 6; 70%: -4 }`
+        final double deg = _piecewise(phase.wiggle, const <double>[0, .2, .45, .7, 1],
+            const <double>[0, -7, 6, -4, 0]);
         _transformAbout(canvas, origin, rotateDeg: deg);
     }
   }
@@ -708,13 +1041,16 @@ class _TautiMascotPainter extends CustomPainter {
     Canvas canvas,
     Offset origin, {
     double rotateDeg = 0,
+    double rotateRadians = 0,
     double scaleX = 1,
     double scaleY = 1,
     double translateY = 0,
   }) {
     canvas.translate(origin.dx, origin.dy + translateY);
-    if (rotateDeg != 0) {
-      canvas.rotate(rotateDeg * math.pi / 180);
+    final double radians =
+        rotateRadians != 0 ? rotateRadians : rotateDeg * math.pi / 180;
+    if (radians != 0) {
+      canvas.rotate(radians);
     }
     if (scaleX != 1 || scaleY != 1) {
       canvas.scale(scaleX, scaleY);
@@ -733,6 +1069,53 @@ class _TautiMascotPainter extends CustomPainter {
     ..cubicTo(74, 176, 54, 164, 54, 142)
     ..close();
 
+  Path _masterCapePath() => Path()
+    ..moveTo(66, 78)
+    ..cubicTo(44, 94, 34, 134, 36, 188)
+    ..cubicTo(54, 197, 146, 197, 164, 188)
+    ..cubicTo(166, 134, 156, 94, 134, 78)
+    ..close();
+
+  Path _legendCapePath() => Path()
+    ..moveTo(70, 76)
+    ..cubicTo(42, 92, 26, 142, 24, 206)
+    ..cubicTo(48, 220, 152, 220, 176, 206)
+    ..cubicTo(174, 142, 158, 92, 130, 76)
+    ..close();
+
+  Path _curatorVestPath() => Path()
+    ..moveTo(58, 108)
+    ..cubicTo(56, 132, 56, 152, 60, 168)
+    ..cubicTo(70, 176, 84, 181, 100, 181)
+    ..cubicTo(116, 181, 130, 176, 140, 168)
+    ..cubicTo(144, 152, 144, 132, 142, 108)
+    ..lineTo(128, 108)
+    ..lineTo(100, 143)
+    ..lineTo(72, 108)
+    ..close();
+
+  Path _crownPath() => Path()
+    ..moveTo(78, 70)
+    ..lineTo(84, 55)
+    ..lineTo(92, 66)
+    ..lineTo(100, 52)
+    ..lineTo(108, 66)
+    ..lineTo(116, 55)
+    ..lineTo(122, 70);
+
+  Path _starPath() => Path()
+    ..moveTo(100, 147)
+    ..lineTo(103.4, 154.2)
+    ..lineTo(111, 155)
+    ..lineTo(105.4, 160.2)
+    ..lineTo(107, 168)
+    ..lineTo(100, 164.4)
+    ..lineTo(93, 168)
+    ..lineTo(94.6, 160.2)
+    ..lineTo(89, 155)
+    ..lineTo(96.6, 154.2)
+    ..close();
+
   Path _sparkPath() => Path()
     ..moveTo(0, -9)
     ..cubicTo(1, -4, 4, -1, 9, 0)
@@ -747,6 +1130,27 @@ class _TautiMascotPainter extends CustomPainter {
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round
     ..color = _ink;
+
+  /// `.o { stroke: #204654; stroke-width: 5; round join/cap }` (stroke only).
+  Paint _outlinePaint(double width) => _inkStroke(width);
+
+  Paint _inkStroke(double width) => Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round
+    ..color = _ink;
+
+  void _drawOutlinedRect(
+    Canvas canvas, {
+    required Rect rect,
+    required double radius,
+    required double strokeWidth,
+  }) {
+    final RRect r = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    canvas.drawRRect(r, Paint()..color = _mist);
+    canvas.drawRRect(r, _inkStroke(strokeWidth));
+  }
 
   void _drawRoundedRectRotated(
     Canvas canvas, {
@@ -780,20 +1184,21 @@ class _TautiMascotPainter extends CustomPainter {
   }
 
   /// `(1 - cos)` shape: 0 at t=0, 1 at t=.5, 0 at t=1 — matches the
-  /// `0,100% -> base / 50% -> peak` easing of the breathe keyframes.
+  /// `0,100% -> base / 50% -> peak` easing of the `ease-in-out` keyframes.
   double _sine(double t) => (1 - math.cos(2 * math.pi * t)) / 2;
 
-  /// Triangle wave 0 -> 1 -> 0 used for the decorative link wiggle.
-  double _triangle(double t) {
+  /// Always-positive modulo, so phase maths stays in `0 .. 1` even when a
+  /// negative `animation-delay` equivalent is subtracted.
+  double _wrap(double t) {
     final double x = t % 1.0;
-    return x < .5 ? x * 2 : (1 - x) * 2;
+    return x < 0 ? x + 1.0 : x;
   }
 
   /// blink: scaleY(1) except a short dip to `.1` near 96%.
   double _blinkScaleY(double t) => _piecewise(
         t,
-        <double>[0, .92, .955, .97, 1],
-        <double>[1, 1, .1, 1, 1],
+        const <double>[0, .92, .955, .97, 1],
+        const <double>[1, 1, .1, 1, 1],
       );
 
   @override

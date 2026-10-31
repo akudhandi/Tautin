@@ -77,5 +77,58 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('sleep pushes the floating z animation', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(const TautiMascot(mood: TautiMood.sleep, width: 140)),
+      );
+      await tester.pump(const Duration(milliseconds: 1200));
+      await tester.pump(const Duration(milliseconds: 1200));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('TautiOutfit', () {
+    test('levels match the design brief', () {
+      expect(TautiOutfit.none.level, 0);
+      expect(TautiOutfit.curator.level, 5);
+      expect(TautiOutfit.master.level, 10);
+      expect(TautiOutfit.legend.level, 20);
+    });
+
+    testWidgets('every outfit can be combined with every mood', (
+      WidgetTester tester,
+    ) async {
+      for (final TautiOutfit outfit in TautiOutfit.values) {
+        for (final TautiMood mood in TautiMood.values) {
+          await tester.pumpWidget(
+            _wrap(TautiMascot(mood: mood, outfit: outfit, width: 120)),
+          );
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(tester.takeException(), isNull, reason: '$outfit/$mood threw');
+        }
+      }
+    });
+
+    testWidgets('switching mood and outfit restarts the animation', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(const TautiMascot(mood: TautiMood.idle, width: 120)),
+      );
+      await tester.pumpWidget(
+        _wrap(
+          const TautiMascot(
+            mood: TautiMood.cheer,
+            outfit: TautiOutfit.legend,
+            width: 120,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.takeException(), isNull);
+    });
   });
 }
