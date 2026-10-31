@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +8,6 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/tautin_theme.dart';
 import '../../../shared/models/link_model.dart';
 import '../../../shared/widgets/smart_link_card.dart';
-import '../../../shared/widgets/tauti_mascot.dart';
 import '../../collections/presentation/collections_screen.dart';
 import '../../gamification/domain/gamification_summary.dart';
 import '../../gamification/presentation/widgets/missions_modal_sheet.dart';
@@ -42,9 +41,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -54,10 +51,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -66,24 +61,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _scrollController.position.maxScrollExtent - 240) {
       ref.read(feedProvider.notifier).loadNextPage();
     }
-  }
-
-  void _onSearchChanged(String query) {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
-      ref.read(searchQueryProvider.notifier).setQuery(query.trim());
-    });
-  }
-
-  void _submitSearch(String query) {
-    _debounceTimer?.cancel();
-    ref.read(searchQueryProvider.notifier).setQuery(query.trim());
-  }
-
-  void _clearSearch() {
-    _searchController.clear();
-    _debounceTimer?.cancel();
-    ref.read(searchQueryProvider.notifier).setQuery('');
   }
 
   Future<void> _pasteFromClipboardAndOpen() async {
@@ -303,74 +280,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
 
-          // Search Field (.search / .dksearch)
+          // Search Field (.search / .dksearch) â€” opens the full search screen
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Container(
-                height: isDark ? 48 : 52,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: isDark ? TautinColors.darkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(isDark ? 24 : 26),
-                  border: isDark
-                      ? Border.all(color: TautinColors.darkBorder)
-                      : null,
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: isDark
-                          ? Colors.black.withValues(alpha: 0.25)
-                          : TautinColors.brandTeal.withValues(alpha: 0.08),
-                      blurRadius: 18,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: <Widget>[
-                    Icon(
-                      Icons.search_rounded,
-                      color: isDark
-                          ? TautinColors.textSecondaryDark
-                          : const Color(0xFF3B5E6C),
-                      size: 22,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _onSearchChanged,
-                        onSubmitted: _submitSearch,
-                        textInputAction: TextInputAction.search,
+              child: GestureDetector(
+                onTap: () => context.push(AppRoutes.search),
+                child: Container(
+                  height: isDark ? 48 : 52,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? TautinColors.darkCard : Colors.white,
+                    borderRadius: BorderRadius.circular(isDark ? 24 : 26),
+                    border: isDark
+                        ? Border.all(color: TautinColors.darkBorder)
+                        : null,
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.25)
+                            : TautinColors.brandTeal.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.search_rounded,
+                        color: isDark
+                            ? TautinColors.textSecondaryDark
+                            : const Color(0xFF3B5E6C),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Cari barang, resep, topik, atau #tag...',
                         style: TextStyle(
                           fontSize: isDark ? 13.5 : 14.5,
                           color: isDark
-                              ? TautinColors.textPrimaryDark
-                              : TautinColors.brandTeal,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Cari barang, resep, topik, atau #tag...',
-                          hintStyle: TextStyle(
-                            fontSize: isDark ? 13.5 : 14.5,
-                            color: isDark
-                                ? TautinColors.textSecondaryDark
-                                : const Color(0xFF5A7580),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
+                              ? TautinColors.textSecondaryDark
+                              : const Color(0xFF5A7580),
                         ),
                       ),
-                    ),
-                    if (_searchController.text.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 20),
-                        onPressed: _clearSearch,
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 32, minHeight: 32),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -492,9 +447,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             data: (FeedState state) {
               if (state.links.isEmpty) {
-                if (_searchController.text.trim().isNotEmpty) {
-                  return _buildEmptySearchResults(context, isDark);
-                }
                 return _buildEmptyFeedSteps(context, isDark);
               }
 
@@ -618,122 +570,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             fontSize: isDark ? 13 : 14,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
             color: textColor,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptySearchResults(BuildContext context, bool isDark) {
-    final String query = _searchController.text.trim();
-    final List<String> suggestions = <String>[
-      'resep ayam',
-      'rendang sapi',
-      'masakan mudah',
-    ];
-
-    return SliverFillRemaining(
-      hasScrollBody: false,
-      child: Center(
-        child: Padding(
-          padding:
-              const EdgeInsets.only(top: 24, left: 28, right: 28, bottom: 96),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const TautiMascot(
-                mood: TautiMood.think,
-                width: 130,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Belum ada yang cocok',
-                style: TautinTheme.jakartaHeading(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: isDark
-                      ? TautinColors.textPrimaryDark
-                      : TautinColors.brandTeal,
-                  letterSpacing: -0.02,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tauti belum menemukan tautan untuk “$query”. Coba kata kunci lain atau simpan tautan barunya.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  height: 1.5,
-                  color: isDark
-                      ? TautinColors.textSecondaryDark
-                      : TautinColors.seamTeal,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: suggestions.map((String s) {
-                  return InkWell(
-                    onTap: () {
-                      _searchController.text = s;
-                      _submitSearch(s);
-                    },
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? TautinColors.darkCard : Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: isDark
-                            ? Border.all(color: TautinColors.darkBorder)
-                            : null,
-                      ),
-                      child: Text(
-                        s,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? TautinColors.textPrimaryDark
-                              : TautinColors.brandTeal,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton(
-                  onPressed: _openQuickAdd,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isDark
-                        ? TautinColors.mintAccent
-                        : TautinColors.brandTeal,
-                    foregroundColor: isDark
-                        ? TautinColors.brandTeal
-                        : TautinColors.creamBackground,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: const Text(
-                    'Simpan tautan baru',
-                    style: TextStyle(
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

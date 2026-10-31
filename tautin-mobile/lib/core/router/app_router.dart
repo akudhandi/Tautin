@@ -9,6 +9,7 @@ import '../../features/collections/presentation/collections_screen.dart';
 import '../../features/home_feed/presentation/home_screen.dart';
 import '../../features/link_detail/presentation/link_detail_screen.dart';
 import '../../features/paywall/presentation/paywall_screen.dart';
+import '../../features/search/presentation/search_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/share_intent/presentation/quick_share_host_screen.dart';
 import '../../shared/models/collection_model.dart';
@@ -25,6 +26,7 @@ abstract final class AppRoutes {
   static const String collections = '/collections';
   static const String collectionDetail = '/collections/:id';
   static const String settings = '/settings';
+  static const String search = '/search';
   static const String linkDetail = '/home/detail/:id';
   // TODO(dev): temporary mascot preview route — remove with the screen.
   static const String devMascot = '/dev/mascot';
@@ -111,6 +113,15 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         name: 'settings',
         builder: (BuildContext context, GoRouterState state) =>
             const SettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.search,
+        name: 'search',
+        builder: (BuildContext context, GoRouterState state) {
+          final Object? extra = state.extra;
+          final String query = extra is String ? extra : '';
+          return SearchScreen(initialQuery: query);
+        },
       ),
       // TODO(dev): temporary mascot preview route — remove with the screen.
       GoRoute(
