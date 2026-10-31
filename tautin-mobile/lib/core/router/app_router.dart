@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../dev/mascot_gallery_screen.dart';
 import '../../features/auth/presentation/onboarding_login_screen.dart';
+import '../../features/collections/presentation/collection_detail_screen.dart';
 import '../../features/collections/presentation/collections_screen.dart';
 import '../../features/home_feed/presentation/home_screen.dart';
 import '../../features/link_detail/presentation/link_detail_screen.dart';
 import '../../features/paywall/presentation/paywall_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/share_intent/presentation/quick_share_host_screen.dart';
+import '../../shared/models/collection_model.dart';
 import '../../shared/models/link_model.dart';
 import '../storage/local_storage_service.dart';
 import '../storage/storage_provider.dart';
@@ -21,6 +23,7 @@ abstract final class AppRoutes {
   static const String quickShare = '/share';
   static const String paywall = '/paywall';
   static const String collections = '/collections';
+  static const String collectionDetail = '/collections/:id';
   static const String settings = '/settings';
   static const String linkDetail = '/home/detail/:id';
   // TODO(dev): temporary mascot preview route — remove with the screen.
@@ -87,6 +90,21 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         name: 'collections',
         builder: (BuildContext context, GoRouterState state) =>
             const Scaffold(body: SafeArea(child: CollectionsScreen())),
+      ),
+      GoRoute(
+        path: AppRoutes.collectionDetail,
+        name: 'collectionDetail',
+        builder: (BuildContext context, GoRouterState state) {
+          final int id =
+              int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+          final CollectionModel? col = state.extra is CollectionModel
+              ? state.extra as CollectionModel
+              : null;
+          return CollectionDetailScreen(
+            collectionId: id,
+            initialCollection: col,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.settings,

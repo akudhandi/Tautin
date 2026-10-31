@@ -8,10 +8,12 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/tautin_theme.dart';
 import '../../../shared/models/collection_model.dart';
 import '../../../shared/models/user_model.dart';
-import '../../home_feed/presentation/home_screen.dart';
 import '../../home_feed/providers/feed_providers.dart';
 import '../providers/collections_providers.dart';
+import 'collection_detail_screen.dart';
+import 'widgets/create_collection_sheet.dart';
 
+/// Screen 4 (Light) & Screen 28 (Dark) — Koleksimu.
 class CollectionsScreen extends ConsumerStatefulWidget {
   const CollectionsScreen({super.key});
 
@@ -23,6 +25,14 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
   String _filter = '';
+
+  static const List<Color> _kPastelColors = <Color>[
+    Color(0xFFA9E0F1),
+    Color(0xFFCAFFA6),
+    Color(0xFFE3F5A4),
+    Color(0xFFD2E8C9),
+    Color(0xFF86C2D1),
+  ];
 
   @override
   void initState() {
@@ -43,89 +53,20 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final List<CollectionModel> current =
         ref.read(collectionsProvider).value ?? <CollectionModel>[];
     final bool isPro = user?.isPro ?? false;
+    final int customCount =
+        current.where((CollectionModel c) => !c.isDefault).length;
 
-    // Free tier max 3 collections limit
-    if (!isPro && current.length >= 3) {
+    if (!isPro && customCount >= 10) {
       context.push(AppRoutes.paywall);
       return;
     }
 
-    final TextEditingController nameController = TextEditingController();
-    bool isPublic = false;
-
-    final bool? created = await showModalBottomSheet<bool>(
+    await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (BuildContext ctx) {
-        final ThemeData theme = Theme.of(ctx);
-        final bool isDark = theme.brightness == Brightness.dark;
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: isDark ? TautinColors.darkCard : Colors.white,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Text(
-                      'Buat Koleksi Baru',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: nameController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        hintText: 'Nama koleksi (mis. Belanja, Resep)...',
-                        prefixIcon: Icon(Icons.folder_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SwitchListTile(
-                      title: const Text('Koleksi Publik'),
-                      subtitle: const Text('Dapat dibagikan dan dilihat siapa saja lewat tautan'),
-                      value: isPublic,
-                      activeThumbColor: TautinColors.brandTeal,
-                      onChanged: (bool val) {
-                        setModalState(() => isPublic = val);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () {
-                        if (nameController.text.trim().isNotEmpty) {
-                          Navigator.of(ctx).pop(true);
-                        }
-                      },
-                      child: const Text('Buat Koleksi'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => const CreateCollectionSheet(),
     );
-
-    if (created == true && nameController.text.trim().isNotEmpty && mounted) {
-      await ref.read(collectionsProvider.notifier).createCollection(
-            name: nameController.text.trim(),
-            isPublic: isPublic,
-          );
-    }
   }
 
   void _showCollectionOptions(CollectionModel col) {
@@ -148,12 +89,34 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 col.name,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
+                  color: isDark
+                      ? TautinColors.textPrimaryDark
+                      : TautinColors.brandTeal,
                 ),
               ),
               const SizedBox(height: 14),
               ListTile(
-                leading: const Icon(Icons.public_rounded),
-                title: Text(col.isPublic ? 'Ubah ke Privat' : 'Jadikan Koleksi Publik'),
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Ubah Nama & Tampilan'),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await showModalBottomSheet<bool>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => CreateCollectionSheet(
+                      initialCollection: col,
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  col.isPublic ? Icons.lock_outline : Icons.public_rounded,
+                ),
+                title: Text(col.isPublic
+                    ? 'Ubah ke Privat'
+                    : 'Jadikan Koleksi Publik'),
                 onTap: () async {
                   Navigator.of(ctx).pop();
                   await ref.read(collectionsProvider.notifier).updateCollection(
@@ -169,7 +132,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   subtitle: Text(AppConfig.publicCollectionUrl(col.slug ?? '')),
                   onTap: () {
                     Navigator.of(ctx).pop();
-                    final String url = AppConfig.publicCollectionUrl(col.slug ?? '');
+                    final String url =
+                        AppConfig.publicCollectionUrl(col.slug ?? '');
                     SharePlus.instance.share(
                       ShareParams(
                         text: 'Lihat koleksi "${col.name}" di Tautin: $url',
@@ -178,59 +142,48 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                     );
                   },
                 ),
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Ubah Nama Koleksi'),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  _editCollectionName(col);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline_rounded, color: TautinColors.errorRed),
-                title: const Text('Hapus Koleksi', style: TextStyle(color: TautinColors.errorRed)),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await ref.read(collectionsProvider.notifier).deleteCollection(col.id);
-                },
-              ),
+              if (!col.isDefault)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded,
+                      color: TautinColors.errorRed),
+                  title: const Text('Hapus Koleksi',
+                      style: TextStyle(color: TautinColors.errorRed)),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    final bool? confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext dCtx) => AlertDialog(
+                        title: const Text('Hapus Koleksi?'),
+                        content: const Text(
+                          'Koleksi akan dihapus permanen. Tautan di dalamnya akan tetap tersimpan di Tanpa Koleksi.',
+                        ),
+                        actions: <Widget>[
+                          TextButton(
+                            onPressed: () => Navigator.of(dCtx).pop(false),
+                            child: const Text('Batal'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: TautinColors.errorRed,
+                            ),
+                            onPressed: () => Navigator.of(dCtx).pop(true),
+                            child: const Text('Hapus'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && mounted) {
+                      await ref
+                          .read(collectionsProvider.notifier)
+                          .deleteCollection(col.id);
+                    }
+                  },
+                ),
             ],
           ),
         );
       },
     );
-  }
-
-  Future<void> _editCollectionName(CollectionModel col) async {
-    final TextEditingController controller =
-        TextEditingController(text: col.name);
-    final String? newName = await showDialog<String>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Ubah Nama Koleksi'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nama baru...'),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-
-    if (newName != null && newName.isNotEmpty && mounted) {
-      await ref
-          .read(collectionsProvider.notifier)
-          .updateCollection(col.id, name: newName);
-    }
   }
 
   @override
@@ -245,6 +198,9 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final List<CollectionModel> collections =
         collectionsAsync.value ?? <CollectionModel>[];
 
+    final int customCount =
+        collections.where((CollectionModel c) => !c.isDefault).length;
+
     final List<CollectionModel> filtered = _filter.isEmpty
         ? collections
         : collections
@@ -258,13 +214,13 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       },
       child: CustomScrollView(
         slivers: <Widget>[
-          // Header: "Koleksimu"
+          // Header: "Koleksimu" + 44px Search button (.hd / .dkhd)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(
                 left: 20,
                 right: 20,
-                top: 54,
+                top: 52,
                 bottom: 12,
               ),
               child: Row(
@@ -295,81 +251,143 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       ],
                     ),
                   ),
-                  Row(
-                    children: <Widget>[
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDark ? TautinColors.darkCard : Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Icon(
-                            _showSearch
-                                ? Icons.close_rounded
-                                : Icons.search_rounded,
-                          ),
-                          color: TautinColors.brandTeal,
-                          onPressed: () {
-                            setState(() {
-                              _showSearch = !_showSearch;
-                              if (!_showSearch) {
-                                _searchController.clear();
-                              }
-                            });
-                          },
-                        ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? TautinColors.darkCard : Colors.white,
+                      shape: BoxShape.circle,
+                      border: isDark
+                          ? Border.all(color: TautinColors.darkBorder)
+                          : null,
+                      boxShadow: isDark
+                          ? null
+                          : <BoxShadow>[
+                              BoxShadow(
+                                color: TautinColors.brandTeal
+                                    .withValues(alpha: 0.06),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                    ),
+                    alignment: Alignment.center,
+                    child: IconButton(
+                      icon: Icon(
+                        _showSearch
+                            ? Icons.close_rounded
+                            : Icons.search_rounded,
+                        size: 20,
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDark ? TautinColors.darkCard : Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.add_rounded),
-                          color: TautinColors.brandTeal,
-                          onPressed: _openCreateDialog,
-                        ),
-                      ),
-                    ],
+                      color: isDark
+                          ? TautinColors.textPrimaryDark
+                          : TautinColors.brandTeal,
+                      onPressed: () {
+                        setState(() {
+                          _showSearch = !_showSearch;
+                          if (!_showSearch) _searchController.clear();
+                        });
+                      },
+                    ),
                   ),
                 ],
               ),
             ),
           ),
 
+          // Search Field
           if (_showSearch)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: TextField(
                   controller: _searchController,
                   autofocus: true,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDark
+                        ? TautinColors.textPrimaryDark
+                        : TautinColors.brandTeal,
+                  ),
+                  decoration: InputDecoration(
                     hintText: 'Cari koleksi...',
-                    prefixIcon: Icon(Icons.search_rounded),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    filled: true,
+                    fillColor: isDark ? TautinColors.darkCard : Colors.white,
                   ),
                 ),
               ),
             ),
 
-          // Quota Banner
+          // 48px Quota Banner Pill matching Screen 4 & Screen 28
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-              child: _buildQuotaBanner(
-                context,
-                collections.where((CollectionModel c) => !c.isDefault).length,
-                isPro,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Container(
+                height: 48,
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: isDark ? 6 : 4,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      isDark ? TautinColors.darkCard : TautinColors.brandTeal,
+                  borderRadius: BorderRadius.circular(24),
+                  border: isDark
+                      ? Border.all(color: TautinColors.darkBorder)
+                      : null,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Text(
+                      isPro ? '👑 PRO' : '$customCount/10',
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: TautinColors.mintAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isPro
+                            ? 'koleksi tanpa batas'
+                            : 'koleksi gratis terpakai',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? TautinColors.textSecondaryDark
+                              : TautinColors.creamBackground,
+                        ),
+                      ),
+                    ),
+                    if (!isPro)
+                      FilledButton(
+                        onPressed: () => context.push(AppRoutes.paywall),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: TautinColors.mintAccent,
+                          foregroundColor: TautinColors.brandTeal,
+                          minimumSize: Size(0, isDark ? 38 : 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        child: const Text('Upgrade'),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Grid of Collections
+          // Grid of Collections (Screen 4 & 28)
           SliverPadding(
             padding: const EdgeInsets.only(
               left: 20,
@@ -382,7 +400,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                mainAxisExtent: 152,
+                mainAxisExtent: 148,
               ),
               delegate: SliverChildBuilderDelegate(
                 (BuildContext ctx, int index) {
@@ -403,210 +421,109 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Widget _buildQuotaBanner(BuildContext context, int count, bool isPro) {
-    if (isPro) {
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: TautinColors.brandTeal,
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: const Row(
-          children: <Widget>[
-            Icon(Icons.star_rounded, color: TautinColors.mintAccent, size: 28),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '👑 PRO Aktif',
-                    style: TextStyle(
-                      color: TautinColors.creamBackground,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                  Text(
-                    'Koleksi tanpa batas & bagikan publik tanpa kuota.',
-                    style: TextStyle(
-                      color: TautinColors.mistTeal,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final bool isExhausted = count >= 10;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: TautinColors.brandTeal,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text(
-                '$count/10',
-                style: const TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 34,
-                  color: TautinColors.mintAccent,
-                  letterSpacing: -0.03,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      isExhausted
-                          ? 'Batas 10 koleksi gratis sudah penuh'
-                          : 'Koleksi akun gratis tersisa ${10 - count}',
-                      style: const TextStyle(
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: TautinColors.creamBackground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Upgrade ke Pro untuk koleksi tanpa batas.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: TautinColors.mistTeal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: () => context.push(AppRoutes.paywall),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: TautinColors.mintAccent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    'Lihat Tautin Pro',
-                    style: TextStyle(
-                      color: TautinColors.brandTeal,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 15,
-                    color: TautinColors.brandTeal,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildCollectionCard(
     BuildContext context,
     CollectionModel col,
     int index,
     bool isDark,
   ) {
-    final List<Color> colors = <Color>[
-      TautinColors.iceBlue,
-      TautinColors.mintAccent,
-      const Color(0xFFE3F5A4),
-      const Color(0xFFD2E8C9),
-      const Color(0xFF86C2D1),
-    ];
-    final Color bgColor = colors[index % colors.length];
+    final Color lightBg = colorFromHex(
+      col.color,
+      fallback: _kPastelColors[index % _kPastelColors.length],
+    );
+
+    // Dark mode alternating .ci / .alt .ci
+    final bool isAlt = index.isOdd;
+    final Color darkCiBg =
+        isAlt ? const Color(0xFF1B3541) : const Color(0xFF25452F);
+    final Color darkCiColor =
+        isAlt ? TautinColors.iceBlue : TautinColors.mintAccent;
 
     return InkWell(
       onTap: () {
-        // Filter feed to this collection and switch to Home
-        ref.read(activeFilterProvider.notifier).setFilter(FeedFilter.all);
-        ref.read(activeTabProvider.notifier).setTab(MainTab.home);
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => CollectionDetailScreen(
+              collectionId: col.id,
+              initialCollection: col,
+            ),
+          ),
+        );
       },
       onLongPress: () => _showCollectionOptions(col),
       borderRadius: BorderRadius.circular(28),
       child: Container(
-        height: 152,
+        height: 148,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: bgColor,
+          color: isDark ? TautinColors.darkCard : lightBg,
           borderRadius: BorderRadius.circular(28),
+          border: isDark
+              ? Border.all(color: TautinColors.darkBorder)
+              : null,
+          boxShadow: isDark
+              ? null
+              : <BoxShadow>[
+                  BoxShadow(
+                    color: TautinColors.brandTeal.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
+            // Top row: circle icon + optional public badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  width: isDark ? 42 : 44,
+                  height: isDark ? 42 : 44,
+                  decoration: BoxDecoration(
+                    color: isDark ? darkCiBg : Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.folder_outlined,
-                    color: TautinColors.brandTeal,
-                    size: 22,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    iconDataForName(col.icon),
+                    color: isDark ? darkCiColor : TautinColors.brandTeal,
+                    size: isDark ? 20 : 22,
                   ),
                 ),
                 if (col.isPublic)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
+                    height: 26,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
-                      color: TautinColors.brandTeal,
-                      borderRadius: BorderRadius.circular(12),
+                      color: isDark
+                          ? TautinColors.darkBackground
+                          : TautinColors.brandTeal,
+                      borderRadius: BorderRadius.circular(13),
+                      border: isDark
+                          ? Border.all(color: TautinColors.darkBorder)
+                          : null,
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         Icon(
                           Icons.public_rounded,
                           size: 11,
-                          color: TautinColors.creamBackground,
+                          color: isDark
+                              ? TautinColors.mintAccent
+                              : TautinColors.creamBackground,
                         ),
-                        SizedBox(width: 3),
+                        const SizedBox(width: 4),
                         Text(
                           'Publik',
                           style: TextStyle(
-                            color: TautinColors.creamBackground,
-                            fontSize: 11,
+                            color: isDark
+                                ? TautinColors.mintAccent
+                                : TautinColors.creamBackground,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -615,6 +532,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   ),
               ],
             ),
+
+            // Bottom info: title + link count
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -622,19 +541,24 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   col.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w700,
-                    fontSize: 15.5,
-                    color: TautinColors.brandTeal,
+                    fontSize: isDark ? 15 : 16,
+                    height: 1.2,
+                    color: isDark
+                        ? TautinColors.textPrimaryDark
+                        : TautinColors.brandTeal,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${col.linksCount} tautan',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: TautinColors.brandTeal,
+                  style: TextStyle(
+                    fontSize: isDark ? 12.5 : 13,
+                    color: isDark
+                        ? TautinColors.textSecondaryDark
+                        : TautinColors.brandTeal,
                   ),
                 ),
               ],
@@ -650,14 +574,13 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       onTap: _openCreateDialog,
       borderRadius: BorderRadius.circular(28),
       child: Container(
-        height: 152,
+        height: 148,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           border: Border.all(
-            color: TautinColors.brandTeal,
+            color: isDark ? TautinColors.darkBorder : TautinColors.brandTeal,
             width: 2,
-            strokeAlign: BorderSide.strokeAlignCenter,
           ),
         ),
         child: Column(
@@ -666,13 +589,17 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             Container(
               width: 44,
               height: 44,
-              decoration: const BoxDecoration(
-                color: TautinColors.brandTeal,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? TautinColors.mintAccent
+                    : TautinColors.brandTeal,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.add_rounded,
-                color: TautinColors.mintAccent,
+                color: isDark
+                    ? TautinColors.brandTeal
+                    : TautinColors.mintAccent,
                 size: 24,
               ),
             ),
@@ -682,7 +609,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
               style: TextStyle(
                 fontFamily: 'Plus Jakarta Sans',
                 fontWeight: FontWeight.w700,
-                fontSize: 14.5,
+                fontSize: isDark ? 14 : 15,
                 color: isDark
                     ? TautinColors.textPrimaryDark
                     : TautinColors.brandTeal,
